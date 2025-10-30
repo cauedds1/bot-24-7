@@ -9,7 +9,8 @@ NOVO MODELO DE CONFIANÇA BASEADO EM PROBABILIDADES ESTATÍSTICAS:
 PHOENIX V2.0: Sistema de VETO + Confiança Calibrada
 """
 
-from config import ODD_MINIMA_DE_VALOR
+from config import (ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_GOLS_OVER_UNDER,
+                    MIN_CONFIANCA_GOLS_OVER_1_5, MIN_CONFIANCA_GOLS_OVER_3_5)
 from analysts.context_analyzer import verificar_veto_mercado
 from analysts.confidence_calculator import calculate_final_confidence
 

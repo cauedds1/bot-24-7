@@ -15,13 +15,51 @@ ODD_MINIMA_DE_VALOR = 1.20  # Reduzido para capturar valor em favoritos
 MIN_CONFIANCA_GERAL = 5.0  # Threshold base para aceitar palpites
 MIN_CONFIANCA_GOLS_OVER_UNDER = 5.0  # Over/Under 2.5 gols
 MIN_CONFIANCA_GOLS_OVER_1_5 = 5.5  # Over 1.5 (mais seguro)
+MIN_CONFIANCA_GOLS_OVER_3_5 = 5.0  # Over 3.5 (mais arriscado)
 MIN_CONFIANCA_CANTOS = 5.0  # Escanteios
+MIN_CONFIANCA_CANTOS_UNDER = 5.5  # Under escanteios (mais conservador)
 MIN_CONFIANCA_CARTOES = 5.0  # Cartões
-MIN_CONFIANCA_BTTS = 5.5  # BTTS
-MIN_CONFIANCA_HANDICAPS = 5.5  # Handicaps
+MIN_CONFIANCA_BTTS_SIM = 5.5  # BTTS Sim
+MIN_CONFIANCA_BTTS_NAO = 6.0  # BTTS Não (mais difícil prever)
+MIN_CONFIANCA_HANDICAPS_FORTE = 6.5  # Handicap alto (ex: -1.5, -2.5)
+MIN_CONFIANCA_HANDICAPS_MEDIO = 6.2  # Handicap médio (ex: -1.0)
+MIN_CONFIANCA_HANDICAPS_BAIXO = 5.5  # Handicap baixo (ex: -0.5, +0.5)
 MIN_CONFIANCA_APOSTA_SIMPLES = 6.0  # Para aposta simples (principal pick)
 MIN_CONFIANCA_MULTIPLA = 5.5  # Para múltiplas
 MIN_CONFIANCA_BINGO = 5.5  # Para bingo (odd alta)
+
+# --- THRESHOLDS DE ODD ---
+ODD_MINIMA_PENALIDADE = 1.40  # Odds abaixo disso têm confiança penalizada
+ODD_MINIMA_TACTICAL_TIP = 1.20  # Mínimo para considerar como tactical tip válido
+
+# --- THRESHOLDS DE PROBABILIDADES E MÉTRICAS ESTATÍSTICAS ---
+# BTTS (Both Teams to Score)
+BTTS_PROB_THRESHOLD_SIM = 0.50  # Probabilidade mínima para BTTS Sim
+BTTS_PROB_THRESHOLD_NAO = 0.45  # Probabilidade máxima para BTTS Não (< 45%)
+
+# Médias de Gols para Análise Contextual
+GOLS_CASA_ATAQUE_FORTE = 1.8  # Casa marca em média 1.8+ gols
+GOLS_FORA_ATAQUE_FORTE = 1.5  # Fora marca em média 1.5+ gols
+GOLS_CASA_DEFESA_FRACA = 1.5  # Casa sofre em média 1.5+ gols
+GOLS_FORA_DEFESA_FRACA = 1.2  # Fora sofre em média 1.2+ gols
+GOLS_JOGO_ABERTO_THRESHOLD = 1.3  # Threshold para detectar jogo aberto
+
+# Médias de Cantos para Análise Contextual
+CANTOS_CASA_ALTO = 6.0  # Casa força 6+ cantos em média
+CANTOS_CASA_MEDIO = 5.5  # Casa força 5.5+ cantos
+CANTOS_CASA_BAIXO = 4.5  # Casa força menos de 4.5 cantos
+CANTOS_LINHA_MINIMA_FT_TOTAL = 7.5  # Linha mínima para Under FT Total
+
+# Médias de Cartões para Análise Contextual
+CARTOES_TIME_FALTOSO = 3.5  # Time com 3.5+ cartões é considerado faltoso
+CARTOES_JOGO_TRUNCADO = 3.0  # 3+ cartões/time indica jogo truncado
+CARTOES_JOGO_TENSO = 2.5  # 2.5+ cartões/time indica tensão
+
+# Handicaps - Diferença de Força
+HANDICAP_DIFERENCA_FORTE = 2.5  # Diferença QSC >= 2.5 para handicaps altos
+
+# Progresso de Temporada
+TEMPORADA_RETA_FINAL = 0.75  # 75% da temporada = reta final
 
 # --- DETECÇÃO DE VALOR CONTEXTUAL ---
 # O bot pode aceitar odds menores quando identifica VALOR baseado em contexto:

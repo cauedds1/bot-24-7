@@ -5,6 +5,14 @@ import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
+from zoneinfo import ZoneInfo
+
+# 🇧🇷 HORÁRIO DE BRASÍLIA: Todas as operações de datetime usam timezone de Brasília
+BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
+
+def agora_brasilia():
+    """Retorna datetime atual no horário de Brasília"""
+    return datetime.now(BRASILIA_TZ)
 
 class DatabaseManager:
     """
@@ -97,8 +105,8 @@ class DatabaseManager:
                 Json(analises.get('contexto', {})),
                 total_palpites,
                 confianca_media,
-                datetime.now(),
-                datetime.now()
+                agora_brasilia(),
+                agora_brasilia()
             ))
 
             conn.commit()
@@ -131,7 +139,7 @@ class DatabaseManager:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # Buscar apenas análises recentes
-            limite_tempo = datetime.now() - timedelta(hours=max_idade_horas)
+            limite_tempo = agora_brasilia() - timedelta(hours=max_idade_horas)
 
             query = """
                 SELECT * FROM analises_jogos 
@@ -172,7 +180,7 @@ class DatabaseManager:
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            limite_tempo = datetime.now() - timedelta(days=dias)
+            limite_tempo = agora_brasilia() - timedelta(days=dias)
 
             query = "DELETE FROM analises_jogos WHERE data_jogo < %s"
             cursor.execute(query, (limite_tempo,))

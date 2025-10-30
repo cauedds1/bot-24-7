@@ -3,6 +3,14 @@ import json
 import os
 import threading
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+# 🇧🇷 HORÁRIO DE BRASÍLIA: Todas as operações de datetime usam timezone de Brasília
+BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
+
+def agora_brasilia():
+    """Retorna datetime atual no horário de Brasília"""
+    return datetime.now(BRASILIA_TZ)
 
 _cache = {}
 _cache_lock = threading.RLock()  # RLock (reentrant) para evitar deadlocks
@@ -40,13 +48,14 @@ def set(key, value, expiration_minutes=None):
     if expiration_minutes is None:
         expiration_minutes = get_expiration_for_key(key)
 
-    expiration_time = datetime.now() + timedelta(minutes=expiration_minutes)
+    now = agora_brasilia()
+    expiration_time = now + timedelta(minutes=expiration_minutes)
 
     with _cache_lock:
         _cache[key] = {
             "value": value, 
             "expires_at": expiration_time.isoformat(),
-            "created_at": datetime.now().isoformat()
+            "created_at": now.isoformat()
         }
     save_cache_to_disk()
 
@@ -64,7 +73,7 @@ def get(key):
         if data.get("expires_at"):
             try:
                 expiration_time = datetime.fromisoformat(data["expires_at"])
-                if datetime.now() > expiration_time:
+                if agora_brasilia() > expiration_time:
                     del _cache[key]
                     save_cache_to_disk()
                     return None
@@ -93,7 +102,7 @@ def get_stats():
         if data.get("expires_at"):
             try:
                 expiration_time = datetime.fromisoformat(data["expires_at"])
-                if datetime.now() <= expiration_time:
+                if agora_brasilia() <= expiration_time:
                     validos += 1
             except (TypeError, ValueError):
                 validos += 1  # Contar como válido se não tem expiração
@@ -136,7 +145,7 @@ def cleanup_expired():
             if data.get("expires_at"):
                 try:
                     expiration_time = datetime.fromisoformat(data["expires_at"])
-                    if datetime.now() > expiration_time:
+                    if agora_brasilia() > expiration_time:
                         keys_to_remove.append(key)
                 except (TypeError, ValueError):
                     pass

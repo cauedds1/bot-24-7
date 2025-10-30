@@ -1,49 +1,87 @@
 """
-PHOENIX V2.0 - DOSSIÊ DO ANALISTA
+PHOENIX V3.0 - DOSSIÊ DO ANALISTA
 ==================================
 
-Formatador de mensagens profissionais no estilo "Dossiê de Análise".
+Formatador de mensagens profissionais implementando EXATAMENTE o Phoenix Protocol.
 
-ESTRUTURA DA MENSAGEM:
+ESTRUTURA DA MENSAGEM (OBRIGATÓRIA):
 1. 🏆 Header: Liga, Data, Horário, Confronto
-2. 💎 Aposta Principal: Mercado, Odd, Confiança
-3. 📖 Justificativa Dinâmica: Baseada em dados reais
-4. 📊 Evidências Estatísticas: Específicas ao mercado da aposta
-5. ✅ Conclusão das Evidências: Resumo de 1 linha
-6. 📋 Apostas Alternativas: Lista simples
+2. 📖 Roteiro Tático: Script selecionado + raciocínio
+3. 💎 ANÁLISE PRINCIPAL: Tip com maior confiança (com/sem odd)
+   - Se SEM odd: título muda para "ANÁLISE PRINCIPAL (OPORTUNIDADE TÁT ICA)"
+4. 🧠 SUGESTÕES TÁTICAS: Outros tips SEM odd (alta confiança mas sem mercado)
+5. 🎯 PALPITES ALTERNATIVOS: Outros tips COM odd (menor confiança)
 """
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
-def format_dossier_message(
+def format_phoenix_dossier(
     jogo: Dict,
-    aposta_principal: Dict,
-    apostas_alternativas: List[Dict],
+    todos_palpites: List[Dict],
     stats_casa: Dict,
     stats_fora: Dict,
+    master_analysis: Dict,
     ultimos_jogos_casa: Optional[List[Dict]] = None,
-    ultimos_jogos_fora: Optional[List[Dict]] = None,
-    master_analysis: Optional[Dict] = None
+    ultimos_jogos_fora: Optional[List[Dict]] = None
 ) -> str:
     """
-    Formata mensagem completa no estilo "Dossiê do Analista".
+    PHOENIX V3.0: Formata mensagem seguindo o Phoenix Protocol exato.
     
     Args:
         jogo: Dados do jogo
-        aposta_principal: Melhor aposta {tipo, odd, confianca, mercado, periodo, time}
-        apostas_alternativas: Lista de apostas alternativas
+        todos_palpites: TODOS os palpites (com e sem odd), ordenados por confiança desc
         stats_casa: Estatísticas time casa
         stats_fora: Estatísticas time fora
-        ultimos_jogos_casa: Últimos 4 jogos do time casa
-        ultimos_jogos_fora: Últimos 4 jogos do time fora
-        master_analysis: Análise do Master Analyzer
+        master_analysis: Análise completa do Master Analyzer (com script e reasoning)
+        ultimos_jogos_casa: Últimos jogos do time casa
+        ultimos_jogos_fora: Últimos jogos do time fora
     
     Returns:
-        str: Mensagem formatada em HTML
+        str: Mensagem formatada em HTML seguindo Phoenix Protocol
     """
+    time_casa = jogo['teams']['home']['name']
+    time_fora = jogo['teams']['away']['name']
+    
     # === SECTION 1: HEADER ===
+    msg = _format_header(jogo)
+    
+    # === SECTION 2: ROTEIRO TÁTICO ===
+    msg += _format_tactical_script(master_analysis, time_casa, time_fora)
+    
+    # === SEPARAR PALPITES: Principal, Táticos sem odd, Alternativos com odd ===
+    # O palpite principal é SEMPRE o de maior confiança (com ou sem odd)
+    if not todos_palpites or len(todos_palpites) == 0:
+        return msg + "\n⚠️ Nenhuma análise de valor identificada para este jogo.\n"
+    
+    palpite_principal = todos_palpites[0]  # Maior confiança
+    restantes = todos_palpites[1:]
+    
+    # Separar restantes em: táticos (sem odd) e alternativos (com odd)
+    sugestoes_taticas = [p for p in restantes if p.get('odd') is None or p.get('odd') == 0]
+    palpites_alternativos = [p for p in restantes if p.get('odd') is not None and p.get('odd') > 0]
+    
+    # === SECTION 3: ANÁLISE PRINCIPAL ===
+    msg += _format_analise_principal(
+        palpite_principal, stats_casa, stats_fora, 
+        time_casa, time_fora, master_analysis,
+        ultimos_jogos_casa, ultimos_jogos_fora
+    )
+    
+    # === SECTION 4: SUGESTÕES TÁTICAS (sem odd) ===
+    if sugestoes_taticas:
+        msg += _format_sugestoes_taticas(sugestoes_taticas)
+    
+    # === SECTION 5: PALPITES ALTERNATIVOS (com odd) ===
+    if palpites_alternativos:
+        msg += _format_palpites_alternativos(palpites_alternativos)
+    
+    return msg
+
+
+def _format_header(jogo: Dict) -> str:
+    """Formata header do jogo."""
     liga_nome = jogo['league']['name']
     time_casa = jogo['teams']['home']['name']
     time_fora = jogo['teams']['away']['name']
@@ -61,258 +99,254 @@ def format_dossier_message(
     msg += f"🕐 <b>Horário:</b> {horario_formatado} (Brasília)\n"
     msg += f"⚽ <b>Confronto:</b> {time_casa} <b>vs</b> {time_fora}\n\n"
     
-    # === SECTION 2: APOSTA PRINCIPAL ===
-    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    msg += f"💎 <b>APOSTA PRINCIPAL</b>\n"
+    return msg
+
+
+def _format_tactical_script(master_analysis: Dict, time_casa: str, time_fora: str) -> str:
+    """Formata seção de Roteiro Tático."""
+    analysis_summary = master_analysis.get('analysis_summary', {})
+    script_name = analysis_summary.get('selected_script', 'SCRIPT_BALANCED_GAME')
+    reasoning = analysis_summary.get('reasoning', 'Análise em andamento')
+    
+    # Limpar nome do script para exibição
+    script_display = script_name.replace('SCRIPT_', '').replace('_', ' ').title()
+    
+    msg = f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"📖 <b>ROTEIRO TÁTICO</b>\n"
     msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    
-    mercado = aposta_principal.get('mercado', 'Gols')
-    tipo = aposta_principal['tipo']
-    odd = aposta_principal['odd']
-    confianca = aposta_principal['confianca']
-    periodo = aposta_principal.get('periodo', 'FT')
-    time_tipo = aposta_principal.get('time', '')
-    
-    # Formatar nome completo da aposta
-    aposta_nome = f"{tipo} {mercado}"
-    if time_tipo and time_tipo != 'Total':
-        aposta_nome += f" ({time_tipo})"
-    if periodo != 'FT':
-        aposta_nome += f" {periodo}"
-    
-    msg += f"🎯 <b>Mercado:</b> {aposta_nome}\n"
-    msg += f"📊 <b>Odd:</b> @{odd}\n"
-    msg += f"💎 <b>Confiança:</b> {confianca:.1f}/10\n\n"
-    
-    # === SECTION 3: JUSTIFICATIVA DINÂMICA ===
-    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    msg += f"📖 <b>JUSTIFICATIVA</b>\n"
-    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    
-    justificativa = generate_dynamic_justification(
-        aposta_principal, stats_casa, stats_fora, 
-        time_casa, time_fora, master_analysis
-    )
-    msg += justificativa + "\n\n"
-    
-    # === SECTION 4: EVIDÊNCIAS ESTATÍSTICAS ===
-    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    msg += f"📊 <b>EVIDÊNCIAS ESTATÍSTICAS</b>\n"
-    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    
-    evidencias, conclusao = generate_statistical_evidence(
-        aposta_principal, ultimos_jogos_casa, ultimos_jogos_fora,
-        stats_casa, stats_fora, time_casa, time_fora
-    )
-    msg += evidencias + "\n\n"
-    
-    # === SECTION 5: CONCLUSÃO DAS EVIDÊNCIAS ===
-    msg += f"✅ <b>Conclusão:</b> {conclusao}\n\n"
-    
-    # === SECTION 6: APOSTAS ALTERNATIVAS ===
-    if apostas_alternativas and len(apostas_alternativas) > 0:
-        msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        msg += f"📋 <b>APOSTAS ALTERNATIVAS</b>\n"
-        msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        
-        for idx, aposta in enumerate(apostas_alternativas[:5], 1):
-            alt_mercado = aposta.get('mercado', 'Gols')
-            alt_tipo = aposta['tipo']
-            alt_odd = aposta['odd']
-            alt_conf = aposta['confianca']
-            alt_periodo = aposta.get('periodo', 'FT')
-            alt_time = aposta.get('time', '')
-            
-            # Formatar nome
-            alt_nome = f"{alt_tipo} {alt_mercado}"
-            if alt_time and alt_time != 'Total':
-                alt_nome += f" ({alt_time})"
-            if alt_periodo != 'FT':
-                alt_nome += f" {alt_periodo}"
-            
-            msg += f"{idx}. {alt_nome} @{alt_odd} - Conf: {alt_conf:.1f}/10\n"
-        
-        msg += "\n"
+    msg += f"🎬 <b>Script:</b> {script_display}\n\n"
+    msg += f"💭 <b>Raciocínio:</b>\n{reasoning}\n\n"
     
     return msg
 
 
-def generate_dynamic_justification(
-    aposta: Dict,
+def _format_analise_principal(
+    palpite: Dict,
     stats_casa: Dict,
     stats_fora: Dict,
     time_casa: str,
     time_fora: str,
-    master_analysis: Optional[Dict]
+    master_analysis: Dict,
+    ultimos_jogos_casa: Optional[List[Dict]],
+    ultimos_jogos_fora: Optional[List[Dict]]
 ) -> str:
-    """
-    Gera justificativa dinâmica baseada em dados reais e contexto tático.
-    NUNCA usa textos genéricos - sempre específica aos dados.
-    """
-    mercado = aposta.get('mercado', 'Gols')
-    tipo = aposta['tipo']
+    """Formata ANÁLISE PRINCIPAL (com ou sem odd)."""
+    tem_odd = palpite.get('odd') is not None and palpite.get('odd') > 0
+    confianca = palpite.get('confianca', 0)
     
-    # Extrair dados relevantes
-    gols_casa_marcados = stats_casa.get('casa', {}).get('gols_marcados', 0)
-    gols_fora_marcados = stats_fora.get('fora', {}).get('gols_marcados', 0)
+    # Título dinâmico baseado em presença de odd
+    if tem_odd:
+        titulo = "💎 <b>ANÁLISE PRINCIPAL</b>"
+    else:
+        titulo = "💎 <b>ANÁLISE PRINCIPAL (OPORTUNIDADE TÁTICA)</b>"
+    
+    msg = f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"{titulo}\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    # Nome do palpite
+    nome_palpite = _format_bet_name(palpite)
+    msg += f"🎯 <b>Mercado:</b> {nome_palpite}\n"
+    
+    if tem_odd:
+        msg += f"📊 <b>Odd:</b> @{palpite['odd']}\n"
+    else:
+        msg += f"⚠️ <b>Odd:</b> Não disponível no mercado (análise estatística pura)\n"
+    
+    msg += f"💎 <b>Confiança:</b> {confianca:.1f}/10\n\n"
+    
+    # Justificativa
+    msg += f"📖 <b>JUSTIFICATIVA:</b>\n"
+    justificativa = _generate_justification(palpite, stats_casa, stats_fora, time_casa, time_fora, master_analysis)
+    msg += justificativa + "\n\n"
+    
+    # Evidências
+    msg += f"📊 <b>EVIDÊNCIAS:</b>\n"
+    evidencias = _generate_evidence(palpite, stats_casa, stats_fora, time_casa, time_fora, ultimos_jogos_casa, ultimos_jogos_fora, master_analysis)
+    msg += evidencias + "\n\n"
+    
+    return msg
+
+
+def _format_sugestoes_taticas(sugestoes: List[Dict]) -> str:
+    """Formata seção de SUGESTÕES TÁTICAS (sem odd)."""
+    msg = f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"🧠 <b>SUGESTÕES TÁTICAS</b>\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    msg += f"<i>Análises de alto valor sem odd disponível no mercado:</i>\n\n"
+    
+    for idx, palpite in enumerate(sugestoes[:3], 1):  # Máximo 3
+        nome = _format_bet_name(palpite)
+        conf = palpite.get('confianca', 0)
+        msg += f"{idx}. <b>{nome}</b>\n"
+        msg += f"   Confiança: {conf:.1f}/10\n\n"
+    
+    return msg
+
+
+def _format_palpites_alternativos(palpites: List[Dict]) -> str:
+    """Formata seção de PALPITES ALTERNATIVOS (com odd)."""
+    msg = f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"🎯 <b>PALPITES ALTERNATIVOS</b>\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    for idx, palpite in enumerate(palpites[:5], 1):  # Máximo 5
+        nome = _format_bet_name(palpite)
+        odd = palpite.get('odd', 0)
+        conf = palpite.get('confianca', 0)
+        msg += f"{idx}. <b>{nome}</b> @{odd} - Conf: {conf:.1f}/10\n"
+    
+    msg += "\n"
+    return msg
+
+
+def _format_bet_name(palpite: Dict) -> str:
+    """Formata nome completo de um palpite."""
+    mercado = palpite.get('mercado', 'Gols')
+    tipo = palpite.get('tipo', '')
+    time_tipo = palpite.get('time', '')
+    periodo = palpite.get('periodo', 'FT')
+    
+    nome = f"{tipo} {mercado}"
+    if time_tipo and time_tipo != 'Total':
+        nome += f" ({time_tipo})"
+    if periodo != 'FT':
+        nome += f" {periodo}"
+    
+    return nome
+
+
+def _generate_justification(
+    palpite: Dict,
+    stats_casa: Dict,
+    stats_fora: Dict,
+    time_casa: str,
+    time_fora: str,
+    master_analysis: Dict
+) -> str:
+    """Gera justificativa dinâmica baseada em dados reais."""
+    mercado = palpite.get('mercado', 'Gols')
+    tipo = palpite.get('tipo', '')
+    
+    # Extrair dados
+    gols_casa = stats_casa.get('casa', {}).get('gols_marcados', 0)
+    gols_fora = stats_fora.get('fora', {}).get('gols_marcados', 0)
     gols_casa_sofridos = stats_casa.get('casa', {}).get('gols_sofridos', 0)
     gols_fora_sofridos = stats_fora.get('fora', {}).get('gols_sofridos', 0)
     
-    # Gerar justificativa específica ao mercado
     if mercado == 'Gols' and 'Over' in tipo:
-        linha = tipo.replace('Over ', '').strip()
-        media_total = gols_casa_marcados + gols_fora_sofridos + gols_fora_marcados + gols_casa_sofridos
-        media_total /= 2
-        
+        media_total = (gols_casa + gols_fora_sofridos + gols_fora + gols_casa_sofridos) / 2
         justificativa = (
-            f"A análise indica <b>{tipo} Gols</b> como a melhor opção para este confronto. "
-            f"{time_casa} apresenta média de <b>{gols_casa_marcados:.1f} gols marcados</b> jogando em casa, "
-            f"enquanto {time_fora} marca <b>{gols_fora_marcados:.1f} gols</b> como visitante. "
+            f"{time_casa} marca <b>{gols_casa:.1f} gols</b> em casa, "
+            f"enquanto {time_fora} marca <b>{gols_fora:.1f} gols</b> fora. "
+            f"Média combinada de <b>{media_total:.1f} gols</b> favorece {tipo}."
         )
-        
-        if media_total > float(linha):
-            justificativa += (
-                f"A média combinada de <b>{media_total:.1f} gols</b> supera confortavelmente a linha {linha}, "
-                f"indicando forte potencial ofensivo de ambos os times."
-            )
-        else:
-            justificativa += (
-                f"Defensivamente, {time_fora} sofre <b>{gols_fora_sofridos:.1f} gols</b> fora de casa, "
-                f"criando oportunidades para o ataque do {time_casa}."
-            )
-        
+    
     elif mercado == 'Gols' and 'Under' in tipo:
         justificativa = (
-            f"Este confronto apresenta características defensivas. "
-            f"{time_casa} tem média de apenas <b>{gols_casa_marcados:.1f} gols</b> em casa, "
-            f"e {time_fora} marca <b>{gols_fora_marcados:.1f} gols</b> fora. "
-            f"Combinado com o perfil tático de ambas equipes, esperamos um jogo mais travado."
+            f"Perfil defensivo: {time_casa} marca apenas <b>{gols_casa:.1f} gols</b> em casa, "
+            f"{time_fora} marca <b>{gols_fora:.1f} gols</b> fora. Jogo travado esperado."
         )
     
     elif mercado == 'Cantos':
         cantos_casa = stats_casa.get('casa', {}).get('cantos_feitos', 0)
         cantos_fora = stats_fora.get('fora', {}).get('cantos_feitos', 0)
-        
         justificativa = (
-            f"No mercado de escanteios, {time_casa} gera <b>{cantos_casa:.1f} escanteios</b> por jogo em casa, "
-            f"enquanto {time_fora} produz <b>{cantos_fora:.1f} escanteios</b> como visitante. "
-            f"A pressão ofensiva esperada favorece {tipo}."
-        )
-    
-    elif mercado == 'Cartões':
-        cartoes_casa = stats_casa.get('casa', {}).get('cartoes_amarelos', 0)
-        cartoes_fora = stats_fora.get('fora', {}).get('cartoes_amarelos', 0)
-        
-        justificativa = (
-            f"Historicamente, {time_casa} recebe <b>{cartoes_casa:.1f} cartões</b> por jogo em casa, "
-            f"e {time_fora} acumula <b>{cartoes_fora:.1f} cartões</b> fora. "
-            f"O histórico disciplinar sugere {tipo} neste confronto."
+            f"{time_casa} força <b>{cantos_casa:.1f} escanteios</b> em casa, "
+            f"{time_fora} força <b>{cantos_fora:.1f} escanteios</b> fora. "
+            f"Volume ofensivo favorece {tipo}."
         )
     
     elif mercado == 'BTTS':
-        if 'Sim' in tipo:
-            justificativa = (
-                f"Ambos os times demonstram capacidade ofensiva: {time_casa} marca {gols_casa_marcados:.1f} gols em casa "
-                f"e {time_fora} marca {gols_fora_marcados:.1f} fora. Simultaneamente, ambos apresentam vulnerabilidades "
-                f"defensivas, criando cenário favorável para ambos balançarem as redes."
-            )
-        else:
-            justificativa = (
-                f"A análise defensiva sugere que pelo menos um time falhará em marcar. "
-                f"{time_casa} tem forte defesa em casa, ou {time_fora} apresenta dificuldades ofensivas fora."
-            )
-    
-    else:
-        # Fallback genérico (mas ainda com dados)
         justificativa = (
-            f"A análise técnica indica {tipo} {mercado} como a oportunidade de maior valor neste confronto, "
-            f"baseada no desempenho recente e nas características táticas de ambas as equipes."
+            f"Análise de gols marcados e sofridos indica {'ambos marcarem' if tipo == 'Sim' else 'pelo menos um time não marcar'}. "
+            f"Casa: {gols_casa:.1f} gols marcados. Fora: {gols_fora:.1f} gols marcados."
         )
     
-    # Adicionar contexto tático se disponível
-    if master_analysis and 'analysis_summary' in master_analysis:
-        script = master_analysis['analysis_summary'].get('selected_script', '')
-        if script:
-            script_nome = script.replace('SCRIPT_', '').replace('_', ' ').title()
-            justificativa += f"\n\n🧠 <b>Contexto Tático:</b> {script_nome}"
+    else:
+        justificativa = f"Análise técnica favorece {tipo} {mercado} baseado nas métricas ponderadas."
+    
+    # Adicionar contexto do script tático
+    script_name = master_analysis.get('analysis_summary', {}).get('selected_script', '')
+    if script_name:
+        script_display = script_name.replace('SCRIPT_', '').replace('_', ' ').title()
+        justificativa += f"\n\n🧠 <b>Contexto Tático:</b> {script_display}"
     
     return justificativa
 
 
-def generate_statistical_evidence(
-    aposta: Dict,
-    ultimos_jogos_casa: Optional[List[Dict]],
-    ultimos_jogos_fora: Optional[List[Dict]],
+def _generate_evidence(
+    palpite: Dict,
     stats_casa: Dict,
     stats_fora: Dict,
     time_casa: str,
-    time_fora: str
-) -> tuple:
-    """
-    Gera evidências estatísticas específicas ao mercado da aposta principal.
-    
-    Returns:
-        tuple: (texto_evidencias, conclusao_uma_linha)
-    """
-    mercado = aposta.get('mercado', 'Gols')
-    tipo = aposta['tipo']
-    
+    time_fora: str,
+    ultimos_jogos_casa: Optional[List[Dict]],
+    ultimos_jogos_fora: Optional[List[Dict]],
+    master_analysis: Dict
+) -> str:
+    """Gera evidências estatísticas (preferencialmente weighted metrics)."""
+    mercado = palpite.get('mercado', 'Gols')
     evidencias = ""
-    conclusao = ""
+    
+    # Tentar usar weighted metrics se disponível
+    weighted_home = master_analysis.get('analysis_summary', {}).get('weighted_metrics_home', {})
+    weighted_away = master_analysis.get('analysis_summary', {}).get('weighted_metrics_away', {})
+    use_weighted = bool(weighted_home and weighted_away)
     
     if mercado == 'Gols':
-        # Mostrar gols nos últimos 4 jogos
-        evidencias += f"<b>Últimos 4 jogos - {time_casa}:</b>\n"
-        
         if ultimos_jogos_casa and len(ultimos_jogos_casa) > 0:
+            evidencias += f"<b>Últimos 4 jogos - {time_casa}:</b>\n"
             for idx, jogo in enumerate(ultimos_jogos_casa[:4], 1):
                 gols = jogo.get('goals_total', 0)
                 evidencias += f"  {idx}. {gols} gols\n"
         else:
-            # Fallback: usar média
-            media = stats_casa.get('casa', {}).get('gols_marcados', 0)
-            evidencias += f"  Média: {media:.1f} gols/jogo\n"
-        
-        evidencias += f"\n<b>Últimos 4 jogos - {time_fora}:</b>\n"
+            media_casa = stats_casa.get('casa', {}).get('gols_marcados', 0)
+            evidencias += f"<b>{time_casa}:</b> Média {media_casa:.1f} gols/jogo\n"
         
         if ultimos_jogos_fora and len(ultimos_jogos_fora) > 0:
+            evidencias += f"\n<b>Últimos 4 jogos - {time_fora}:</b>\n"
             for idx, jogo in enumerate(ultimos_jogos_fora[:4], 1):
                 gols = jogo.get('goals_total', 0)
                 evidencias += f"  {idx}. {gols} gols\n"
         else:
-            media = stats_fora.get('fora', {}).get('gols_marcados', 0)
-            evidencias += f"  Média: {media:.1f} gols/jogo\n"
-        
-        # Conclusão baseada no tipo
-        if 'Over' in tipo:
-            linha = tipo.replace('Over ', '').strip()
-            conclusao = f"7 dos últimos 8 jogos combinados superaram a marca de {linha} gols."
-        else:
-            conclusao = f"Padrão defensivo consistente nos jogos recentes de ambas equipes."
+            media_fora = stats_fora.get('fora', {}).get('gols_marcados', 0)
+            evidencias += f"<b>{time_fora}:</b> Média {media_fora:.1f} gols/jogo\n"
     
     elif mercado == 'Cantos':
-        cantos_casa = stats_casa.get('casa', {}).get('cantos_feitos', 0)
-        cantos_fora = stats_fora.get('fora', {}).get('cantos_feitos', 0)
-        
-        evidencias += f"<b>{time_casa} (Casa):</b> {cantos_casa:.1f} escanteios/jogo\n"
-        evidencias += f"<b>{time_fora} (Fora):</b> {cantos_fora:.1f} escanteios/jogo\n"
-        evidencias += f"<b>Média Combinada:</b> {(cantos_casa + cantos_fora):.1f} escanteios"
-        
-        conclusao = f"Pressão ofensiva constante gera volume elevado de escanteios."
+        if use_weighted:
+            cantos_casa_weighted = weighted_home.get('weighted_corners_for', 0)
+            cantos_fora_weighted = weighted_away.get('weighted_corners_for', 0)
+            evidencias += f"<b>Cantos Ponderados por SoS:</b>\n"
+            evidencias += f"  {time_casa}: {cantos_casa_weighted:.1f} cantos/jogo\n"
+            evidencias += f"  {time_fora}: {cantos_fora_weighted:.1f} cantos/jogo\n"
+            evidencias += f"  Média combinada: {(cantos_casa_weighted + cantos_fora_weighted):.1f}\n"
+        else:
+            cantos_casa = stats_casa.get('casa', {}).get('cantos_feitos', 0)
+            cantos_fora = stats_fora.get('fora', {}).get('cantos_feitos', 0)
+            evidencias += f"<b>Cantos:</b>\n"
+            evidencias += f"  {time_casa}: {cantos_casa:.1f} cantos/jogo\n"
+            evidencias += f"  {time_fora}: {cantos_fora:.1f} cantos/jogo\n"
     
     elif mercado == 'Cartões':
-        cartoes_casa = stats_casa.get('casa', {}).get('cartoes_amarelos', 0)
-        cartoes_fora = stats_fora.get('fora', {}).get('cartoes_amarelos', 0)
-        
-        evidencias += f"<b>{time_casa}:</b> {cartoes_casa:.1f} cartões/jogo\n"
-        evidencias += f"<b>{time_fora}:</b> {cartoes_fora:.1f} cartões/jogo\n"
-        evidencias += f"<b>Expectativa Total:</b> {(cartoes_casa + cartoes_fora):.1f} cartões"
-        
-        conclusao = f"Histórico disciplinar indica {tipo} como cenário provável."
+        cartoes_casa = stats_casa.get('casa', {}).get('cartoes_amarelos', 0) + stats_casa.get('casa', {}).get('cartoes_vermelhos', 0)
+        cartoes_fora = stats_fora.get('fora', {}).get('cartoes_amarelos', 0) + stats_fora.get('fora', {}).get('cartoes_vermelhos', 0)
+        evidencias += f"<b>Cartões:</b>\n"
+        evidencias += f"  {time_casa}: {cartoes_casa:.1f} cartões/jogo\n"
+        evidencias += f"  {time_fora}: {cartoes_fora:.1f} cartões/jogo\n"
     
-    else:
-        # Fallback genérico
-        evidencias += f"Dados históricos e performance recente suportam a análise."
-        conclusao = f"Evidências estatísticas alinham-se com a projeção."
+    # Adicionar QSC se disponível
+    qsc_home = master_analysis.get('analysis_summary', {}).get('qsc_home')
+    qsc_away = master_analysis.get('analysis_summary', {}).get('qsc_away')
+    if qsc_home and qsc_away:
+        evidencias += f"\n<b>Quality Score (QSC):</b>\n"
+        evidencias += f"  {time_casa}: {qsc_home:.0f}\n"
+        evidencias += f"  {time_fora}: {qsc_away:.0f}\n"
     
-    return evidencias, conclusao
+    return evidencias
+
+
+# Manter compatibilidade com código existente
+def format_dossier_message(*args, **kwargs):
+    """Wrapper para compatibilidade. Use format_phoenix_dossier diretamente."""
+    return format_phoenix_dossier(*args, **kwargs)

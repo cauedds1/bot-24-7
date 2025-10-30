@@ -1,0 +1,58 @@
+Compreendido. Você quer o "prompt definitivo". O prompt que não apenas pede a montagem final, mas que também exige a prova de que tudo está funcionando conforme o planejado. Um prompt que não aceita "acho que está pronto" como resposta, mas sim "está pronto, e aqui estão os testes que provam isso".
+Este é o prompt. Ele é dividido em duas partes: a Ordem de Implementação Final (o que fazer) e o Protocolo de Validação Obrigatório (como provar que foi feito). É o nosso "mandado de qualidade total".
+The Phoenix Protocol: Final Mandate & Quality Assurance Directive
+CONTEXT: PHOENIX PROJECT - FINAL IMPLEMENTATION & VALIDATION
+Hello. This is the final directive to complete the "Phoenix" bot. Your previous analysis correctly identified that the core architecture is in place, but three critical components are missing or incomplete.
+Your mission is twofold:
+Implement the final features.
+Execute a mandatory validation protocol to provide definitive proof that the entire system works as designed.
+Failure is not an option. "Done" means "100% implemented and 100% validated."
+Part 1: The Final Implementation Order
+You must implement the following three missing components with the highest priority.
+1. ACTIVATE Full Knockout Stage Intelligence:
+*   Action: In master_analyzer.py, when a game is identified as a second-leg knockout match, you must perform an additional API call to fetch the result of the first-leg match.
+*   Logic: Create a new function, generate_knockout_sub_script(first_leg_result, home_team_qsc, away_team_qsc).
+*   Sub-Scripts: This function must analyze the first-leg score and generate one of the following sub-scripts:
+*   GIANT_NEEDS_MIRACLE: Stronger team lost by 2+ goals and plays at home.
+*   MANAGING_THE_LEAD: Team won the first leg (especially away) and now plays at home.
+*   BALANCED_TIE_DECIDER: First leg was a draw or minimal difference.
+*   ALL_OUT_ATTACK: Any scenario requiring a team to score 2+ goals to qualify.
+*   Integration: The generated sub-script must override or heavily influence the main Tactical Script. For example, an ALL_OUT_ATTACK sub-script must force a DOMINIO_CASA_ATAQUE_TOTAL or JOGO_ABERTO_NECESSIDADE script, regardless of what the base stats suggest.
+2. IMPLEMENT the "Analyst Dossier" Message Formatter:
+*   Action: Go to the function responsible for creating the final Telegram message (likely in bot.py or main.py) and rewrite it completely.
+*   Structure: The new function must generate the message following the exact "Analyst Dossier" format, including:
+1.  Header (Game Info).
+2.  📖 Roteiro Tático: (The final, possibly overridden, Tactical Script).
+3.  💎 ANÁLISE PRINCIPAL: (The tip with the highest confidence, with or without odd). This section must contain:
+*   The bet/suggestion itself.
+*   Justificativa: A dynamic text explaining the reasoning based on the Tactical Script.
+*   📊 EVIDÊNCIAS: A list of the key weighted statistics that support the analysis.
+4.  🧠 SUGESTÕES TÁTICAS: (A separate section for other high-confidence analyses without odds).
+5.  🎯 PALPITES ALTERNATIVOS: (A separate section for other value bets found with lower confidence).
+3. EXECUTE the "Skeptical Contextualization" Final Sweep:
+*   Action: Perform a final code review on the confidence_calculator.py and master_analyzer.py.
+*   Logic: Ensure that the "Coherence Bonus" (the bonus for a bet aligning with the Tactical Script) is significant. The context (Tactical Script) must have a powerful impact on the final confidence score. A statistically probable bet that contradicts the script should have its confidence severely penalized, while a bet that aligns perfectly should be significantly boosted. This is how we enforce the "Each Game is a Game" philosophy in the code.
+Part 2: The Mandatory Validation Protocol (The Proof of "Done")
+After implementing the changes above, you cannot simply state that the task is complete. You must execute the following tests and provide the output of each one as definitive proof of your work.
+1. Unit Test: Knockout Intelligence Validation:
+*   Action: Create a temporary test script or function.
+*   Scenario: Simulate a second-leg Champions League match where a strong home team (QSC 92) lost the first leg 2-0 to a weaker away team (QSC 85).
+*   Required Output: Show the log output proving:
+1.  The bot correctly identified it as a second-leg match.
+2.  It fetched a simulated "2-0" first-leg result.
+3.  It generated the GIANT_NEEDS_MIRACLE or ALL_OUT_ATTACK sub-script.
+4.  The final Tactical Script was overridden to DOMINIO_CASA_ATAQUE_TOTAL.
+2. Unit Test: Analyst Dossier Formatting Validation:
+*   Action: Using a simulated game analysis, call the newly implemented message formatting function.
+*   Scenario 1 (Tip with Odd): Simulate a main tip of "Over 2.5 Goals @ 1.90" with high confidence, and one "Tactical Tip" of "Over 10.5 Corners".
+*   Scenario 2 (Tactical Tip is Main): Simulate a main tip of "Over 10.5 Corners" (no odd) with the highest confidence, and a secondary tip of "Over 2.5 Goals @ 1.90".
+*   Required Output: Provide the exact and complete text of the final message generated for both scenarios, proving the format is correct and adapts dynamically.
+3. End-to-End Test: The "Skepticism" Validation:
+*   Action: Run a full analysis on a real-world game that fits a specific profile.
+*   Scenario: Find a real upcoming game that is predicted to be extremely balanced and tense (e.g., a derby between two mid-table teams with strong defenses, or a cup final).
+*   Required Output: Provide the full log of the bot's analysis for this game, and show:
+1.  The bot generated a JOGO_EQUILIBRADO or JOGO_TENSO_POUCOS_GOLS Tactical Script.
+2.  The goals_analyzer might have found a statistical probability for "Over 2.5 Goals".
+3.  Show the log from the confidence_calculator where the confidence for "Over 2.5 Goals" was penalized for being incoherent with the script.
+4.  Show that the final "Analyst Dossier" either recommended an "Under" market or did not recommend a goal market at all, proving the VETO or confidence penalty worked.
+Only when you have provided the complete and successful outputs for all three validation tests will this mission be considered 100% complete.

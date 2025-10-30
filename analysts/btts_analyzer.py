@@ -1,5 +1,6 @@
 # analysts/btts_analyzer.py
-from config import ODD_MINIMA_DE_VALOR
+from config import (ODD_MINIMA_DE_VALOR, BTTS_PROB_THRESHOLD_SIM, BTTS_PROB_THRESHOLD_NAO,
+                    MIN_CONFIANCA_BTTS_SIM, MIN_CONFIANCA_BTTS_NAO)
 from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
 
 def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
@@ -20,9 +21,9 @@ def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
     # LAYER 3 & 4: VETO e ajuste de confiança por script
 
     if 'btts_yes' in odds and odds['btts_yes'] >= ODD_MINIMA_DE_VALOR:
-        if prob_ambas_marcam >= 0.50:
+        if prob_ambas_marcam >= BTTS_PROB_THRESHOLD_SIM:
             tipo = "BTTS Sim"
-            confianca = min(round(5.0 + (prob_ambas_marcam - 0.50) * 10, 1), 9.5)
+            confianca = min(round(5.0 + (prob_ambas_marcam - BTTS_PROB_THRESHOLD_SIM) * 10, 1), 9.5)
             
             # Verificar veto se script disponível
             if script_name:
@@ -33,7 +34,7 @@ def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
                 else:
                     confianca = ajustar_confianca_por_script(confianca, tipo, script_name)
             
-            if confianca >= 5.5:
+            if confianca >= MIN_CONFIANCA_BTTS_SIM:
                 palpites_btts.append({
                     "tipo": "Sim",
                     "confianca": confianca,
@@ -41,9 +42,9 @@ def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
                 })
 
     if 'btts_no' in odds and odds['btts_no'] >= ODD_MINIMA_DE_VALOR:
-        if prob_ambas_marcam < 0.45:
+        if prob_ambas_marcam < BTTS_PROB_THRESHOLD_NAO:
             tipo = "BTTS Não"
-            confianca = min(round(5.0 + (0.45 - prob_ambas_marcam) * 10, 1), 9.5)
+            confianca = min(round(5.0 + (BTTS_PROB_THRESHOLD_NAO - prob_ambas_marcam) * 10, 1), 9.5)
             
             # Verificar veto se script disponível
             if script_name:
@@ -54,7 +55,7 @@ def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
                 else:
                     confianca = ajustar_confianca_por_script(confianca, tipo, script_name)
             
-            if confianca >= 6.0:
+            if confianca >= MIN_CONFIANCA_BTTS_NAO:
                 palpites_btts.append({
                     "tipo": "Não",
                     "confianca": confianca,

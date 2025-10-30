@@ -1,0 +1,31 @@
+Prompt de Varredura e Blindagem (System Sweep & Hardening)
+CONTEXT: PHOENIX PROJECT - FINAL SWEEP
+Hello. We have implemented several major features (Dynamic QSC, Tactical Scripts, Tactical Tips, Knockout Stage Analysis). Before we proceed with mass testing, we need to perform a full system sweep to ensure the code is clean, robust, and consistent.
+This is a "hardening" and "quality assurance" task. You must scan the entire codebase and perform the following three missions.
+Mission 1: Code Optimization & Cleanup
+1. The Goal:
+Improve code quality, remove redundancies, and ensure best practices are followed.
+2. The Required Action:
+Scan for Redundant Code: Look for any old functions, variables, or logic from the "V1" bot that are no longer being used after the implementation of the new architecture (e.g., old static quality scores, old analysis logic inside the market analyzers). Delete them.
+Centralize Configuration: Scan all files (.py). Find any "magic numbers" or hardcoded thresholds (like a minimum confidence score of 7.5 or a minimum value of 1.1) scattered in the code. Move all of them to the central config.py file. The code should reference config.MIN_CONFIDENCE, not a hardcoded number.
+Standardize Logging: Ensure all print() statements used for debugging follow a consistent format. For example:
+[INFO] Booting up the bot...
+[DEBUG] Calculating QSC for team X...
+[WARNING] API returned no odds for market Y.
+[ERROR] Failed to fetch data from API. Reason: ...
+Mission 2: System Hardening (Error Proofing)
+1. The Goal:
+Make the bot resilient. It should never crash due to predictable problems like missing API data or unexpected values.
+2. The Required Action:
+Wrap All API Calls in try/except Blocks: Go to every single function that makes a call to the API-Football (e.g., in api_client.py). Enclose these calls in try/except blocks. If an API call fails (due to network error, API key issue, etc.), it should log the error gracefully and return None or an empty list [], not crash the entire program.
+Implement "Defensive Checks" for None: Scan the entire code for places where you process the result of a function that might return None (especially results from API calls). Before you try to access data from that result (e.g., result['response']), you must check if the result is not None. For example:
+Bad: data = api_client.get_fixtures() -> games = data['response'] (This will crash if data is None).
+Good: data = api_client.get_fixtures() -> if data and data['response']: games = data['response'] else: games = []
+Database Initialization Check: In db_manager.py or wherever the database is first used, add a function that checks if all required tables (like analises_jogos) exist upon startup. If a table does not exist, the function should automatically create it. This prevents the bot from crashing on its first-ever run.
+Mission 3: Logic & Consistency Verification
+1. The Goal:
+Ensure all the new modules are working together correctly and consistently, following the "Phoenix" philosophy.
+2. The Required Action:
+Trace the "Confidence" Flow: Start in a market analyzer (e.g., goals_analyzer.py). Verify that the confidence score is being correctly passed to the master_analyzer.py. Then, verify that the master_analyzer correctly collects all tips and their confidence scores. Finally, confirm that the message formatting logic correctly identifies and uses the tip with the absolute highest confidence as the Main Tip.
+Verify the VETO System: Go to master_analyzer.py where the Tactical Script (Roteiro Tático) is generated. Then, go to a market analyzer (e.g., goals_analyzer.py) and check the verificar_veto_mercado() function. Confirm that the analyzer correctly receives the Tactical Script and that its VETO rules are logical (e.g., a JOGO_EQUILIBRADO script correctly vetoes an "Over 3.5 Goals" bet).
+Check the "No-Odd" Path: Manually trace the logic for a "Tactical Tip". Ensure that when an analyzer fails to find an odd, it correctly generates the special "tactical" dictionary, and that this dictionary is correctly processed and formatted by the final message creation function, as specified in our "Tactical Tip" upgrade.

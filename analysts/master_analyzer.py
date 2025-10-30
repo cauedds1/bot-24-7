@@ -369,12 +369,38 @@ def _select_match_script(analysis_data):
     """
     🎬 ROTEIRISTA: Seleciona Match Script baseado em CENÁRIO TÁTICO completo.
     
+    PHOENIX V3.0: Knockout scenarios podem fazer OVERRIDE do script base.
+    
     Args:
         analysis_data: Todos os dados incluindo momento, perfil tático, cenário
     
     Returns:
         tuple: (script_name, reasoning)
     """
+    # === PRIORIDADE MÁXIMA: KNOCKOUT SCENARIO OVERRIDE ===
+    # Jogos de mata-mata têm lógica própria que SOBREPÕE análises normais
+    knockout_scenario = analysis_data.get('knockout_scenario')
+    
+    if knockout_scenario and knockout_scenario.get('is_knockout') and knockout_scenario.get('script_modifier'):
+        script_modifier = knockout_scenario['script_modifier']
+        description = knockout_scenario.get('description', '')
+        tactical_impl = knockout_scenario.get('tactical_implications', {})
+        
+        # Gerar reasoning detalhado baseado no cenário de knockout
+        reasoning = f"🏆 KNOCKOUT SCENARIO: {description}\n"
+        
+        if 'first_leg_result' in knockout_scenario:
+            reasoning += f"   📊 Jogo de Ida: {knockout_scenario['first_leg_result']}\n"
+            reasoning += f"   📈 Situação Agregada: {knockout_scenario.get('aggregate_situation', 'N/A')}\n"
+        
+        if tactical_impl:
+            reasoning += f"   💥 Intensidade: {tactical_impl.get('expected_intensity', 'N/A')}\n"
+            reasoning += f"   🏠 Casa: {tactical_impl.get('home_approach', 'N/A')}\n"
+            reasoning += f"   ✈️ Fora: {tactical_impl.get('away_approach', 'N/A')}"
+        
+        print(f"\n  🎯 KNOCKOUT OVERRIDE: Script base sobreposto por {script_modifier}")
+        return (script_modifier, reasoning)
+    
     # Criar cenário tático primeiro
     scenario = _create_match_scenario(analysis_data)
     
@@ -833,12 +859,92 @@ def generate_match_analysis(jogo):
     
     # Extrair rodada atual (para Season Start Adjustment)
     rodada_atual = 0
+    league_round = jogo.get('league', {}).get('round', '')
     try:
-        league_round = jogo.get('league', {}).get('round', '')
         if league_round:
             rodada_atual = int(''.join(filter(str.isdigit, league_round)))
     except (ValueError, TypeError):
         rodada_atual = 0
+    
+    # 🏆 KNOCKOUT SCENARIO ANALYSIS - PHOENIX V3.0
+    knockout_scenario = None
+    from analysts.knockout_analyzer import is_knockout_match, is_second_leg, analyze_knockout_scenario
+    from api_client import buscar_jogo_de_ida_knockout
+    
+    if is_knockout_match(league_id, league_round):
+        print(f"🏆 KNOCKOUT DETECTADO: {league_round}")
+        
+        # Verificar se é jogo de volta
+        if is_second_leg(league_round):
+            print("   🔄 SEGUNDO JOGO - Buscando resultado do jogo de ida...")
+            
+            # Buscar resultado do 1º jogo via API
+            first_leg = buscar_jogo_de_ida_knockout(home_team_id, away_team_id, league_id)
+            
+            if first_leg:
+                print(f"   ✅ Jogo de ida encontrado: {first_leg['home_goals']} x {first_leg['away_goals']}")
+                
+                # Determinar qual time jogou em casa no 1º jogo
+                # Se home_team_id atual == away_team_id do 1º jogo, então ele jogou FORA no 1º jogo
+                current_home_was_away_in_first_leg = (home_team_id == first_leg['away_team_id'])
+                
+                # CALCULAR QSC ANTES (necessário para análise de knockout)
+                from analysts.context_analyzer import calculate_dynamic_qsc
+                from api_client import buscar_classificacao_liga
+                
+                classificacao_temp = buscar_classificacao_liga(league_id)
+                
+                # Buscar stats temporariamente para QSC
+                home_stats_temp = buscar_estatisticas_gerais_time(home_team_id, league_id)
+                away_stats_temp = buscar_estatisticas_gerais_time(away_team_id, league_id)
+                
+                qsc_home_temp = calculate_dynamic_qsc(home_stats_temp, home_team_id, classificacao_temp, home_team_name, league_id, rodada_atual) if home_stats_temp else 50
+                qsc_away_temp = calculate_dynamic_qsc(away_stats_temp, away_team_id, classificacao_temp, away_team_name, league_id, rodada_atual) if away_stats_temp else 50
+                
+                # Analisar cenário de knockout
+                knockout_scenario = analyze_knockout_scenario(
+                    first_leg_home_goals=first_leg['home_goals'],
+                    first_leg_away_goals=first_leg['away_goals'],
+                    home_qsc=qsc_home_temp,
+                    away_qsc=qsc_away_temp,
+                    current_home_team_was_away_in_first_leg=current_home_was_away_in_first_leg
+                )
+                
+                knockout_scenario['is_knockout'] = True
+                knockout_scenario['is_second_leg'] = True
+                
+                print(f"   🎯 CENÁRIO: {knockout_scenario['scenario_type']}")
+                print(f"   📖 {knockout_scenario['description']}")
+                print(f"   ⚡ Script Modifier: {knockout_scenario['script_modifier']}")
+            else:
+                # Fallback se não encontrar 1º jogo
+                knockout_scenario = {
+                    'is_knockout': True,
+                    'is_second_leg': True,
+                    'scenario_type': 'BALANCED_TIE_DECIDER',
+                    'description': 'Jogo de volta (resultado da ida não encontrado)',
+                    'script_modifier': None
+                }
+                print(f"   ⚠️ Jogo de ida não encontrado - usando cenário padrão")
+        else:
+            # Primeiro jogo de mata-mata
+            knockout_scenario = {
+                'is_knockout': True,
+                'is_second_leg': False,
+                'scenario_type': 'FIRST_LEG',
+                'description': 'Primeiro jogo de mata-mata',
+                'script_modifier': 'SCRIPT_MATA_MATA_IDA',
+                'tactical_implications': {
+                    'expected_intensity': 'ALTA',
+                    'home_approach': 'BUSCAR VANTAGEM SEM SE EXPOR',
+                    'away_approach': 'NÃO TOMAR GOL É PRIORIDADE',
+                    'goals_tendency': 'MÉDIO (ambos cautelosos)',
+                    'btts_tendency': 'PROVÁVEL (ambos buscam gol fora)',
+                }
+            }
+            print(f"   ✅ Primeiro jogo de mata-mata identificado")
+    else:
+        knockout_scenario = {'is_knockout': False}
     
     print("📊 Buscando estatísticas dos times...")
     print(f"  🔍 Home ID: {home_team_id} | League ID: {league_id} | Rodada: {rodada_atual}")
@@ -916,7 +1022,8 @@ def generate_match_analysis(jogo):
         'goals_avg_home': goals_home,
         'goals_avg_away': goals_away,
         'venue_city': venue_info.get('city', ''),
-        'relegation_battle': False
+        'relegation_battle': False,
+        'knockout_scenario': knockout_scenario  # PHOENIX V3.0: Knockout Intelligence
     }
     
     print("🎬 Selecionando Match Script...")

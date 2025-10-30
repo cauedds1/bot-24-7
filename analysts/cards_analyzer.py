@@ -1,5 +1,5 @@
 # analysts/cards_analyzer.py
-from config import ODD_MINIMA_DE_VALOR
+from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CARTOES, MIN_CONFIANCA_CANTOS_UNDER
 from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
 
 def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, script_name=None):

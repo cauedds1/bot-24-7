@@ -24,6 +24,7 @@ LIGAS_DE_INTERESSE = [
     1,  # Copa do Mundo FIFA
     4,  # Eurocopa (UEFA Euro)
     9,  # Copa América
+    15,  # FIFA Club World Cup (Mundial de Clubes)
     
     # EUROPA - UEFA
     2, 3, 848,  # Champions League, Europa League, Conference League
@@ -128,6 +129,7 @@ LIGAS_DE_INTERESSE = [
     # Brasil
     71, 72,  # Brasileirão Série A, Série B
     74,  # Brasileirão Série C (3ª Divisão)
+    75,  # Brasileirão Série D (4ª Divisão)
     73,  # Copa do Brasil
     
     # Argentina
@@ -443,6 +445,11 @@ def buscar_jogos_do_dia():
     brasilia_tz = ZoneInfo("America/Sao_Paulo")
     agora_brasilia = datetime.now(brasilia_tz)
     
+    # Determinar temporada atual automaticamente
+    mes_atual = agora_brasilia.month
+    ano_atual = agora_brasilia.year
+    season = str(ano_atual) if mes_atual >= 7 else str(ano_atual - 1)
+    
     # 🎯 LÓGICA DE BUSCA POR HORÁRIO
     # Antes das 20:30 BRT: buscar apenas HOJE
     # Após 20:30 BRT: buscar HOJE + AMANHÃ (jogos noturnos aparecem no dia seguinte na API UTC)
@@ -457,13 +464,13 @@ def buscar_jogos_do_dia():
     if horario_decimal >= 20.5:  # 20:30 ou depois
         datas_buscar = [hoje_brt, amanha_brt]
         print(f"🌙 Após 20:30 BRT - Buscando HOJE ({hoje_brt}) + AMANHÃ ({amanha_brt})")
-        cache_key = f"jogos_{hoje_brt}_{amanha_brt}"
+        cache_key = f"jogos_{hoje_brt}_{amanha_brt}_s{season}"
     else:
         datas_buscar = [hoje_brt]
         print(f"☀️ Antes das 20:30 BRT - Buscando apenas HOJE ({hoje_brt})")
-        cache_key = f"jogos_{hoje_brt}"
+        cache_key = f"jogos_{hoje_brt}_s{season}"
     
-    print(f"   (Horário Brasília: {agora_brasilia.strftime('%H:%M')})")
+    print(f"   (Horário Brasília: {agora_brasilia.strftime('%H:%M')}, Season: {season})")
     
     if cached_data := cache_manager.get(cache_key):
         print(f"✅ CACHE HIT: {len(cached_data)} jogos encontrados no cache")
@@ -473,10 +480,16 @@ def buscar_jogos_do_dia():
     todos_os_jogos = []
 
     for data_busca in datas_buscar:
-        print(f"\n📅 Buscando data: {data_busca}")
+        print(f"\n📅 Buscando data: {data_busca} (Season: {season})")
         
         for idx, liga_id in enumerate(LIGAS_DE_INTERESSE, 1):
-            params = {"league": str(liga_id), "season": "2025", "date": data_busca, "status": "NS"}
+            params = {"league": str(liga_id), "season": season, "date": data_busca, "status": "NS"}
+            
+            # 🔍 DEBUG: Log dos parâmetros enviados à API
+            if idx == 1:  # Log apenas na primeira liga para não poluir
+                print(f"   [DEBUG] Parâmetros API: {params}")
+                print(f"   [DEBUG] URL: {API_URL}fixtures")
+            
             try:
                 response = requests.get(API_URL + "fixtures", headers=HEADERS, params=params, timeout=10)
                 response.raise_for_status()
@@ -493,7 +506,28 @@ def buscar_jogos_do_dia():
                 print(f"  [{idx}/{len(LIGAS_DE_INTERESSE)}] Liga {liga_id}: ERRO - {str(e)[:50]}")
                 continue
 
-    print(f"\n✅ Busca completa: {len(todos_os_jogos)} jogos encontrados (HOJE + AMANHÃ)")
+    # 🔄 FALLBACK: Se não encontrou jogos hoje E não estamos após 20:30, tentar AMANHÃ
+    if len(todos_os_jogos) == 0 and horario_decimal < 20.5:
+        print(f"\n🔄 FALLBACK: Nenhum jogo encontrado para HOJE, buscando AMANHÃ ({amanha_brt})...")
+        
+        for idx, liga_id in enumerate(LIGAS_DE_INTERESSE, 1):
+            params = {"league": str(liga_id), "season": season, "date": amanha_brt, "status": "NS"}
+            try:
+                response = requests.get(API_URL + "fixtures", headers=HEADERS, params=params, timeout=10)
+                response.raise_for_status()
+
+                if data := response.json():
+                    if data['results'] > 0:
+                        jogos_novos = len(data['response'])
+                        todos_os_jogos.extend(data['response'])
+                        print(f"  [{idx}/{len(LIGAS_DE_INTERESSE)}] Liga {liga_id}: +{jogos_novos} jogos (Total: {len(todos_os_jogos)})")
+            except:
+                continue
+        
+        if len(todos_os_jogos) > 0:
+            print(f"✅ FALLBACK bem-sucedido: {len(todos_os_jogos)} jogos encontrados para AMANHÃ")
+
+    print(f"\n✅ Busca completa: {len(todos_os_jogos)} jogos encontrados")
     cache_manager.set(cache_key, todos_os_jogos)  # Usa padrão de 240 min (4h)
     return todos_os_jogos
 
@@ -517,10 +551,11 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
     cache_key = f"stats_{time_id}_liga_{id_liga}"
     if cached_data := cache_manager.get(cache_key): return cached_data
 
-    # Determinar temporada atual automaticamente
-    from datetime import datetime
-    mes_atual = datetime.now().month
-    ano_atual = datetime.now().year
+    # Determinar temporada atual automaticamente (horário de Brasília)
+    brasilia_tz = ZoneInfo("America/Sao_Paulo")
+    agora = datetime.now(brasilia_tz)
+    mes_atual = agora.month
+    ano_atual = agora.year
 
     # Se estamos entre janeiro-junho, usar ano anterior (maioria das ligas termina em maio/junho)
     # Se estamos entre julho-dezembro, usar ano atual (novas temporadas começam em agosto)
@@ -765,6 +800,79 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
         print(f"  ❌ ERRO buscando stats do time {time_id}: {e}")
         return None
 
+def buscar_jogo_de_ida_knockout(home_team_id: int, away_team_id: int, league_id: int):
+    """
+    Busca o jogo de ida de uma eliminatória (1st Leg) entre dois times.
+    
+    Args:
+        home_team_id: ID do time mandante atual (jogo de volta)
+        away_team_id: ID do time visitante atual (jogo de volta)
+        league_id: ID da liga/competição
+        
+    Returns:
+        dict ou None: {
+            'home_team_id': int,
+            'away_team_id': int,
+            'home_goals': int,
+            'away_goals': int,
+            'date': str
+        }
+    """
+    cache_key = f"first_leg_{home_team_id}_{away_team_id}_{league_id}"
+    if cached_data := cache_manager.get(cache_key):
+        return cached_data
+    
+    params = {"h2h": f"{home_team_id}-{away_team_id}", "league": str(league_id), "last": "3"}
+    
+    try:
+        time.sleep(1.6)
+        response = requests.get(API_URL + "fixtures/headtohead", headers=HEADERS, params=params, timeout=10)
+        response.raise_for_status()
+        
+        response_json = response.json()
+        
+        print(f"\n  🔍 Buscando jogo de ida: Time {home_team_id} vs {away_team_id} (Liga {league_id})")
+        
+        if data := response_json.get('response'):
+            print(f"     → {len(data)} jogos encontrados no H2H")
+            
+            # Procurar o jogo mais recente que seja "1st Leg" ou jogo de ida
+            for jogo in data:
+                league_round = jogo.get('league', {}).get('round', '')
+                fixture_status = jogo['fixture']['status']['short']
+                
+                # Deve ser finalizado
+                if fixture_status not in ['FT', 'AET', 'PEN']:
+                    continue
+                
+                # Deve ter "1st Leg" ou "ida" no nome da rodada
+                first_leg_keywords = ["1st Leg", "ida", "Ida", "Andata", "Hinspiel"]
+                is_first_leg = any(keyword.lower() in league_round.lower() for keyword in first_leg_keywords)
+                
+                if is_first_leg:
+                    resultado = {
+                        'home_team_id': jogo['teams']['home']['id'],
+                        'away_team_id': jogo['teams']['away']['id'],
+                        'home_goals': jogo['goals']['home'],
+                        'away_goals': jogo['goals']['away'],
+                        'date': jogo['fixture']['date'],
+                        'round': league_round
+                    }
+                    
+                    print(f"     ✅ Jogo de ida encontrado: {resultado['home_goals']} x {resultado['away_goals']} ({league_round})")
+                    cache_manager.set(cache_key, resultado, expiration_minutes=1440)  # 24h
+                    return resultado
+            
+            print(f"     ⚠️ Nenhum jogo de ida encontrado nos últimos confrontos")
+            return None
+        else:
+            print(f"     ⚠️ Nenhum H2H encontrado")
+            return None
+    
+    except Exception as e:
+        print(f"  ❌ ERRO buscando jogo de ida: {e}")
+        return None
+
 def buscar_h2h(time1_id: int, time2_id: int, limite: int = 5):
     """
     Busca histórico de confrontos diretos (H2H) entre dois times.
@@ -834,9 +942,11 @@ def buscar_ultimos_jogos_time(time_id: int, limite: int = 5, _tentativa: int = 1
     if cached_data := cache_manager.get(cache_key):
         return cached_data
 
-    # Determinar temporada atual automaticamente
-    mes_atual = datetime.now().month
-    ano_atual = datetime.now().year
+    # Determinar temporada atual automaticamente (horário de Brasília)
+    brasilia_tz = ZoneInfo("America/Sao_Paulo")
+    agora = datetime.now(brasilia_tz)
+    mes_atual = agora.month
+    ano_atual = agora.year
     season = str(ano_atual) if mes_atual >= 7 else str(ano_atual - 1)
 
     params = {"team": str(time_id), "season": season, "last": str(limite)}

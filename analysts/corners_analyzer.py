@@ -1,19 +1,20 @@
 # analysts/corners_analyzer.py
-from config import ODD_MINIMA_DE_VALOR
+from config import (ODD_MINIMA_DE_VALOR, ODD_MINIMA_PENALIDADE, MIN_CONFIANCA_CANTOS,
+                    MIN_CONFIANCA_CANTOS_UNDER, CANTOS_LINHA_MINIMA_FT_TOTAL)
 from analysts.context_analyzer import analisar_compatibilidade_ofensiva_defensiva, verificar_veto_mercado, ajustar_confianca_por_script
 
 def ajustar_confianca_por_odd(confianca_base, odd):
     """Ajusta a confiança baseado na odd: penaliza odds muito altas."""
-    if odd < 1.4:
-        return max(confianca_base - 1.0, 5.0)
+    if odd < ODD_MINIMA_PENALIDADE:
+        return max(confianca_base - 1.0, MIN_CONFIANCA_CANTOS)
     elif odd <= 2.5:
         return confianca_base
     elif odd <= 3.5:
-        return max(confianca_base - 0.5, 5.5)
+        return max(confianca_base - 0.5, MIN_CONFIANCA_CANTOS_UNDER)
     elif odd <= 5.0:
-        return max(confianca_base - 1.5, 5.5)
+        return max(confianca_base - 1.5, MIN_CONFIANCA_CANTOS_UNDER)
     else:
-        return max(confianca_base - 2.5, 5.0)
+        return max(confianca_base - 2.5, MIN_CONFIANCA_CANTOS)
 
 def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, pos_casa="N/A", pos_fora="N/A", master_data=None, script_name=None):
     """

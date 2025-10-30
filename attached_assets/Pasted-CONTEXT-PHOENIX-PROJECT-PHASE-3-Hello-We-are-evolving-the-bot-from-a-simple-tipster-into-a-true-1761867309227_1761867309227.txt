@@ -1,0 +1,46 @@
+CONTEXT: PHOENIX PROJECT - PHASE 3
+Hello. We are evolving the bot from a simple tipster into a true "Specialist Analyst". This requires fixing a new critical bug and implementing two major intelligence upgrades. This is a single, large-scale update.
+TASK 1: CRITICAL BUG FIX - "No Games Found" Error
+1. The Problem:
+The bot is incorrectly returning the message "Não encontrei ligas com jogos para hoje," even when there are games scheduled. This indicates a failure in the initial game fetching logic, likely in the api_client.py or wherever the /fixtures endpoint is called.
+2. The Required Action:
+Debug the Fixture Fetching Logic: Go to the function responsible for fetching the day's games (e.g., buscar_jogos_do_dia).
+Check API Parameters: The most likely cause is an incorrect date parameter being sent to the /fixtures endpoint. Ensure the date is being formatted correctly (e.g., YYYY-MM-DD) and that it correctly represents the current day according to the bot's timezone.
+Log the API Call: Add a print() statement to show the exact URL and parameters being sent to the API (e.g., print(f"[DEBUG] Fetching fixtures with params: {params}")).
+Implement a Fallback: If the API returns no games for "today", make a second API call for "tomorrow" (date = today + 1 day). This makes the bot more resilient and useful, especially for users in different timezones who might be looking for the next day's games.
+The Fix: Correct the logic to ensure the bot reliably fetches the list of available games for the current day.
+TASK 2: INTELLIGENCE UPGRADE - The "Tactical Tip" (No-Odd Suggestions)
+1. The Goal:
+The bot must stop discarding good analysis just because an odd is not available in our API. It needs to become a "Consultant Analyst".
+2. The Required Action:
+Modify All Market Analyzers (corners_analyzer.py, cards_analyzer.py, etc.):
+If an analyzer calculates a high statistical confidence for a specific line (e.g., "Over 10.5 Corners") but finds no corresponding odd in the API, it must not return empty.
+Instead, it must generate a special "Tactical Tip" dictionary. This dictionary must contain: {'type': 'tactical', 'suggestion': 'Over 10.5 Corners', 'confidence': 9.2, 'market': 'Corners', ...}.
+Upgrade the master_analyzer.py:
+The master_analyzer must now collect both regular tips (with odds) and these new "Tactical Tips".
+The process for selecting the Main Tip must be updated: it must select the tip with the highest confidence score, regardless of whether it has an odd or not.
+Upgrade the Message Formatting Logic (bot.py/main.py):
+The final message must adapt based on the type of the Main Tip.
+If the Main Tip has an odd: The format remains the "Analyst Dossier" we designed. Any "Tactical Tips" should be listed in a separate section called 🧠 SUGESTÕES DE ANÁLISE (SEM ODDS NA API).
+If the Main Tip is a "Tactical Tip" (no odd): The main section should be retitled 💎 ANÁLISE PRINCIPAL (OPORTUNIDADE TÁTICA) and clearly state the trend to look for (e.g., "Tendência: Over 9.5 Escanteios (FT)"), followed by its statistical confidence, justification, and evidence.
+TASK 3: INTELLIGENCE UPGRADE - "Knockout Stage Scenario Analysis"
+1. The Goal:
+The bot must learn to analyze knockout stage games (like Libertadores, Champions League) with a higher level of intelligence, considering the context of the entire tie, not just a single match.
+2. The Required Action:
+Enhance the master_analyzer.py:
+Detect Knockout Stage Games: When analyzing a game, the bot must check if the competition is a cup/continental tournament and if the game is in a knockout round (e.g., round contains "Round of 16", "Quarter-finals", "Semi-finals").
+Fetch First-Leg Result: If it's a second-leg match, the bot must perform an additional API call to find the result of the first-leg match.
+Implement "Scenario Analysis" Logic: Create a new function, e.g., analyze_knockout_scenario(first_leg_result, home_team_qsc, away_team_qsc). This function will analyze the first-leg score and the teams' quality to generate a specific, nuanced sub-script that will heavily influence the main Tactical Script.
+Develop Sub-Scripts: This new function should identify scenarios like:
+GIANT_NEEDS_MIRACLE: A much stronger team lost the first leg by 2+ goals and plays at home (e.g., Palmeiras vs. LDU). Tendency: All-out attack, high risk, favoring Over Corners/Shots for the home team and potential for Over Cards.
+MANAGING_THE_LEAD: A team won the first leg away and now plays at home. Tendency: Cautious play, less offensive risk, favoring Under goals.
+BALANCED_TIE_DECIDER: First leg was a draw or a minimal difference. Tendency: Tense, tactical, low-scoring game, favoring Under goals and potentially Over Cards due to tension.
+Integrate with Tactical Script: The main Tactical Script must be heavily influenced by this new sub-script. For example, even if the teams are statistically "balanced", a GIANT_NEEDS_MIRACLE sub-script must override it and produce a DOMINIO_CASA_ATAQUE_TOTAL script.
+FINAL DELIVERY MANDATE
+This is a major system overhaul. After you are done, the bot must:
+Correctly fetch the games for the day.
+Be able to generate "Tactical Tips" when odds are missing.
+Select its Main Tip based on the highest confidence, with or without an odd.
+Analyze knockout stage games with a deep, contextual understanding of the tie.
+Deliver all this intelligence in the correct, flexible "Analyst Dossier" message format.
+The goal is to create a bot that thinks and communicates like a world-class sports analyst.

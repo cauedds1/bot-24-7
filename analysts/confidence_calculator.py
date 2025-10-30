@@ -174,27 +174,32 @@ def apply_tactical_script_modifier(
     if not tactical_script:
         return 0.0
     
-    # Mapeamento: bet_type -> scripts coerentes (bonus) e incoerentes (penalidade)
+    # PHOENIX V3.0: SKEPTICAL CONTEXTUALIZATION
+    # O contexto tático deve ter POWERFUL IMPACT na confiança
+    # Coherence Bonus aumentado para garantir que o script DOMINA sobre stats brutas
+    
     coherence_map = {
         "Over 2.5": {
-            "coherent": ["SCRIPT_OPEN_HIGH_SCORING_GAME", "SCRIPT_DOMINIO_CASA", "SCRIPT_DOMINIO_VISITANTE"],
-            "bonus": 1.0
+            "coherent": ["SCRIPT_OPEN_HIGH_SCORING_GAME", "SCRIPT_DOMINIO_CASA", "SCRIPT_DOMINIO_VISITANTE", 
+                        "SCRIPT_TIME_EM_CHAMAS_CASA", "SCRIPT_TIME_EM_CHAMAS_FORA"],
+            "bonus": 1.5  # Aumentado de 1.0 para garantir impacto forte
         },
         "Under 2.5": {
-            "coherent": ["SCRIPT_CAGEY_TACTICAL_AFFAIR", "SCRIPT_RELEGATION_BATTLE", "SCRIPT_JOGO_DE_COMPADRES"],
-            "bonus": 1.0
+            "coherent": ["SCRIPT_CAGEY_TACTICAL_AFFAIR", "SCRIPT_RELEGATION_BATTLE", "SCRIPT_JOGO_DE_COMPADRES",
+                        "SCRIPT_TIGHT_LOW_SCORING", "SCRIPT_BALANCED_TACTICAL_BATTLE"],
+            "bonus": 1.5  # Aumentado de 1.0
         },
         "Over 1.5": {
             "coherent": ["SCRIPT_OPEN_HIGH_SCORING_GAME", "SCRIPT_TIME_EM_CHAMAS_CASA", "SCRIPT_TIME_EM_CHAMAS_FORA"],
-            "bonus": 0.8
+            "bonus": 1.2  # Aumentado de 0.8
         },
         "BTTS Sim": {
             "coherent": ["SCRIPT_BALANCED_RIVALRY_CLASH", "SCRIPT_OPEN_HIGH_SCORING_GAME"],
-            "bonus": 1.0
+            "bonus": 1.5  # Aumentado de 1.0
         },
         "BTTS Não": {
             "coherent": ["SCRIPT_GIANT_VS_MINNOW", "SCRIPT_DOMINIO_CASA", "SCRIPT_DOMINIO_VISITANTE"],
-            "bonus": 1.0
+            "bonus": 1.5  # Aumentado de 1.0
         }
     }
     
@@ -208,16 +213,17 @@ def apply_tactical_script_modifier(
     if not bet_key:
         return 0.0
     
-    # Verificar coerência
+    # Verificar coerência PERFEITA
     if tactical_script in coherence_map[bet_key]["coherent"]:
         return coherence_map[bet_key]["bonus"]
     
-    # Verificar se é INCOERENTE (vetado)
-    # Ex: "Over 2.5" com script "Under" é incoerente
-    if "over" in bet_type.lower() and "CAGEY" in tactical_script:
-        return -1.5
-    if "under" in bet_type.lower() and "OPEN_HIGH_SCORING" in tactical_script:
-        return -1.5
+    # PHOENIX V3.0: PENALIDADE SEVERA para incoerência
+    # "Each Game is a Game" - contexto sobrepõe probabilidade
+    # Aumentado de -1.5 para -2.5 para garantir impacto FORTE
+    if "over" in bet_type.lower() and ("CAGEY" in tactical_script or "LOW_SCORING" in tactical_script or "JOGO_DE_COMPADRES" in tactical_script):
+        return -2.5  # SEVERE penalty - stat pode dizer Over mas contexto diz Under
+    if "under" in bet_type.lower() and ("OPEN_HIGH_SCORING" in tactical_script or "TIME_EM_CHAMAS" in tactical_script):
+        return -2.5  # SEVERE penalty - stat pode dizer Under mas contexto diz Over
     
     return 0.0
 

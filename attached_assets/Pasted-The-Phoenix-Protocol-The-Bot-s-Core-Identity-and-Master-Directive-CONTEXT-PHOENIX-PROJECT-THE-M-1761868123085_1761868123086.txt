@@ -1,0 +1,48 @@
+The Phoenix Protocol: The Bot's Core Identity and Master Directive
+CONTEXT: PHOENIX PROJECT - THE MASTER PROTOCOL
+Hello. This document is the definitive and master directive for the "Phoenix Project." It supersedes all previous individual prompts and serves as the core constitution for the bot we are building. You must read and understand this entire protocol before writing or modifying any line of code. This document defines the bot's philosophy, personality, and mission.
+Part 1: The Guiding Philosophy (The "Why")
+The bot is not a simple "tipster." It is a Virtual Human Analyst. Its primary goal is not to predict winners, but to understand the narrative of a football match and identify statistical tendencies that offer value. It must embody the following core principles in every analysis:
+"Each Game is a Game" - The Principle of Skeptical Contextualization:
+This is the most important principle. It does not mean ignoring history ("amnesia"). It means treating history with skepticism.
+The bot must never blindly apply a historical result or a statistical average. It must always ask: "Given the current context (competition, team form, injuries, motivation, first-leg result), is this historical data still relevant, or is it a trap?"
+Example: A team's high goal average in the league is weak evidence for a high-scoring game in a tense cup final. The bot must recognize this conflict and weigh the context (cup final tension) more heavily than the raw historical stat.
+Analysis First, Opportunity Second:
+The bot's first job is to calculate the most probable statistical tendency of a match (e.g., "high chance of corners," "low chance of goals"). This is its "analysis."
+Only after defining its analysis does it look for a market opportunity (an odd).
+The highest confidence analysis is ALWAYS the main tip, even if no odd is found in our API. This is a "Tactical Tip" and is the bot's most valuable output.
+Process Over Outcome:
+The bot's success is measured by the quality of its analytical process, not by whether a single bet wins or loses.
+A lost bet with a strong, logical, and evidence-based analysis is a success for the process. A winning bet based on flawed or simplistic logic is a failure. The bot must be built to optimize its process, not to chase short-term results.
+Part 2: The Analytical Brain (The "How")
+To execute this philosophy, the bot's brain is a multi-layered "Analytical Funnel." Every analysis must pass through these layers in order:
+Layer 1: Universal Power Rating (Dynamic QSC): Create a universal "Quality Score" for each team. This is not static. It must be dynamically calculated based on a weighted formula of:
+Historical Reputation (a small, foundational weight).
+Current League Standing.
+Recent Form (last 5-10 games).
+Goal Difference.
+League Strength Modifier: A team's QSC must be adjusted by the tier of its league (e.g., Premier League > Eredivisie).
+Layer 2: Performance in Context (Strength of Schedule - SoS):
+Raw stats are meaningless. The bot must calculate Weighted Metrics.
+For every past game used in a statistic (e.g., goals scored), the bot must look at the QSC of the opponent in that game. A goal against a QSC 90 team is worth more than a goal against a QSC 60 team. All key stats (goals, corners, cards, shots) must be weighted by the quality of the opposition faced.
+Layer 3: The Match Narrative (Tactical Script & VETO System):
+Using the contextual data from Layers 1 & 2, the bot generates a Tactical Script (e.g., DOMINIO_CASA, JOGO_EQUILIBRADO, GIGANTE_FERIDO_EM_CASA).
+Knockout Stage Intelligence: If the game is a knockout match second leg, the bot must fetch the first-leg result. This result then triggers a sub-script (e.g., MANAGING_THE_LEAD, ALL_OUT_ATTACK) that heavily influences or even overrides the main Tactical Script.
+The VETO: Each Tactical Script contains a set of "common sense" vetos. A JOGO_EQUILIBRADO script MUST veto any high-scoring bets like "Over 3.5 Goals," preventing absurd suggestions.
+Layer 4: The Final Decision (Confidence Calculator & Justification):
+The final confidence score is not just a probability. It is a calibrated score that starts with a base statistical probability and is then modified by:
+Coherence Bonus: Does the bet align with the Tactical Script? (e.g., "Over Corners" in an ALL_OUT_ATTACK script gets a bonus).
+Value Score Bonus: Does the odd offer significant value compared to the calculated probability?
+Risk Penalty: High odds (high risk) should receive a slight confidence penalty to temper over-optimism.
+The Justification: The bot must be able to explain its reasoning. It will generate a dynamic text that explains the Tactical Script and presents the key Weighted Metrics as evidence for its main analysis.
+Part 3: The Voice of the Analyst (The "What")
+The final output is the "Analyst Dossier" message. It must be formatted to reflect the bot's intelligence and philosophy.
+Clear Hierarchy: The message is structured around the Main Analysis (the tip with the highest confidence, with or without an odd).
+Transparency: It must always present the Tactical Script and the Justification.
+Evidence-Based: It must include a section of 📊 EVIDÊNCIAS with the most relevant (and weighted) statistics that support the main analysis.
+Clear Segmentation:
+💎 ANÁLISE PRINCIPAL: The main tip. Title changes to OPORTUNIDADE TÁTICA if it has no odd.
+🧠 SUGESTÕES TÁTICAS: A separate section for other high-confidence analyses that had no odds.
+🎯 PALPITES ALTERNATIVOS: A separate section for other value bets found with lower confidence.
+Final Mandate: Your Mission
+Your task is to ensure the entire codebase reflects this protocol. Scan every file, from main.py to the individual analyzers. Refactor, rewrite, or create whatever is necessary to make this vision a reality. The bot's code should be a direct implementation of this philosophy. This protocol is your single source of truth.
