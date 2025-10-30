@@ -665,13 +665,24 @@ def _analyze_strength_of_schedule(team_id, league_id):
     opponents_qsc = []
     
     for jogo in ultimos_jogos[:5]:
-        # Identificar o adversário
-        if jogo.get('home_team_id') == team_id:
-            opponent_id = jogo.get('away_team_id')
-            opponent_name = jogo.get('away_team')
+        # Identificar o adversário - acessar corretamente a estrutura aninhada
+        teams_data = jogo.get('teams', {})
+        home_team_id = teams_data.get('home', {}).get('id')
+        away_team_id = teams_data.get('away', {}).get('id')
+        
+        if home_team_id == team_id:
+            opponent_id = away_team_id
+            opponent_name = jogo.get('away_team', teams_data.get('away', {}).get('name', 'Unknown'))
         else:
-            opponent_id = jogo.get('home_team_id')
-            opponent_name = jogo.get('home_team')
+            opponent_id = home_team_id
+            opponent_name = jogo.get('home_team', teams_data.get('home', {}).get('name', 'Unknown'))
+        
+        # Validação robusta: pular jogo se opponent_id for inválido
+        if opponent_id is None or not isinstance(opponent_id, int):
+            print(f"    ⚠️ [SoS DEBUG] ID do adversário inválido (None ou não-inteiro) no jogo {jogo.get('fixture_id', 'unknown')} - pulando...")
+            continue
+        
+        print(f"    🔍 [SoS DEBUG] Buscando stats para adversário ID: {opponent_id} ({opponent_name})")
         
         # Buscar stats do adversário para calcular QSC
         from api_client import buscar_estatisticas_gerais_time
@@ -680,6 +691,8 @@ def _analyze_strength_of_schedule(team_id, league_id):
         if opponent_stats:
             opponent_qsc = calculate_dynamic_qsc(opponent_stats, opponent_id, None, opponent_name, league_id, 0)
             opponents_qsc.append(opponent_qsc)
+        else:
+            print(f"    ⚠️ [SoS DEBUG] Não foi possível obter stats do adversário ID {opponent_id} - pulando...")
     
     if not opponents_qsc:
         return {
@@ -752,8 +765,10 @@ def _calculate_weighted_metrics(team_id, league_id, sos_data):
     for idx, jogo in enumerate(ultimos_jogos[:5]):
         stats = jogo.get('statistics', {})
         
-        # Determinar se jogou em casa ou fora
-        eh_casa = jogo.get('home_team_id') == team_id
+        # Determinar se jogou em casa ou fora - acessar corretamente a estrutura aninhada
+        teams_data = jogo.get('teams', {})
+        home_team_id = teams_data.get('home', {}).get('id')
+        eh_casa = home_team_id == team_id
         team_key = 'home' if eh_casa else 'away'
         opponent_key = 'away' if eh_casa else 'home'
         
