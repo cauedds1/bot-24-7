@@ -1,0 +1,52 @@
+Hello. We are at the final stage of a major overhaul. This is a comprehensive directive to fix a critical error, recalibrate the system, implement a new message format, and deliver a fully operational, production-ready bot.
+
+**1. The Core Problem: A "Perfectionist" Bot That Produces Nothing**
+
+First, the context: The bot's new analytical engine ("Analytical Funnel") is working, but it is **failing to produce ANY betting tips**. It consistently returns the message "Não encontrei mais oportunidades de valor".
+
+This is a **calibration error**. The new logic is too strict, and its filtering thresholds (for `confianca` and `value`) are set so high that no bet is considered good enough. Our primary goal is to fix this silence and make the bot productive.
+
+**2. The 3-Step Action Plan: What You Must Do**
+
+Your mission is to execute the following three steps in order to deliver a complete and working product.
+
+**STEP 1: RECALIBRATE SENSITIVITY THRESHOLDS**
+
+You must adjust the minimum `confianca` and `value` thresholds to a more realistic level.
+
+1.  **Self-Diagnosis:** Add temporary `print()` statements to the code to log the `confianca` and `value` for every potential bet *before* it gets filtered.
+2.  **Analysis:** Look at the logged numbers. You will likely see that the calculated `confianca` scores are consistently below the current minimum requirement (e.g., scores are around 6.0, but the minimum is 7.5).
+3.  **The Fix (Recalibration):** Go to the configuration file (e.g., `config.py`) where variables like `MIN_CONFIANCA_GERAL` are defined. **Lower these values.** A logical new threshold would be slightly below the average scores you observed. For example, if the average confidence is 6.0, set the new `MIN_CONFIANCA_GERAL` to `5.5`. The goal is to allow good, logical bets to pass the filter.
+4.  **Cleanup:** After recalibrating, remove the temporary diagnostic `print()` statements.
+
+**STEP 2: IMPLEMENT NEW MESSAGE FORMAT - "THE ANALYST DOSSIER"**
+
+The final output message sent to Telegram must be completely redesigned to be a professional, data-rich "dossier".
+
+1.  **Structure:** The message must follow this clear structure:
+    *   **Header:** League, Date, Time, and Match (`[Home Team] vs [Away Team]`).
+    *   **Main Bet Section:** The primary, most confident bet, including Market, Odd, and Confidence Score.
+    *   **Dynamic Justification:** A unique, convincing text explaining *why* this bet makes sense, based on the Tactical Script and key stats. **No generic texts.** This justification is only for the main bet.
+    *   **Statistical Evidence:** A section showing relevant stats from the last 4 games. This data **must be specific to the market of the main bet**.
+        *   *Example for "Total Goals" bet:* Show the total goals in each of the last 4 matches for both teams.
+        *   *Example for "Home Team Corners" bet:* Show the home team's corner count in their last 4 matches.
+        *   *Example for "Total Corners" bet:* Show the total corners in the last 4 matches of each team.
+    *   **Evidence Conclusion:** A brief, one-line summary of the statistical evidence (e.g., "7 of the last 8 combined games exceeded the 2.5 goal line.").
+    *   **Alternative Bets Section:** A simple list of other potential bets for the same game, showing only Market, Odd, and Confidence.
+
+2.  **Formatting:** Use HTML formatting (e.g., `<b>` for bold) and relevant emojis (🏆, 🗓️, ⚽, 💎, 📖, 📊, ✅, 📋) to create a clear visual hierarchy and improve readability.
+
+**STEP 3: SYSTEM HARDENING & FINAL INTEGRITY CHECK**
+
+After fixing the calibration and implementing the new message format, you must perform a final, comprehensive system integrity check.
+
+1.  **Full Code Sweep:** Perform a deep scan of **all `.py` files**.
+2.  **Error & Inconsistency Correction:** Proactively identify and fix any potential issues: syntax errors, logical inconsistencies, potential errors with `None` values, etc.
+3.  **Veto System Verification:** Double-check that the VETO system is correctly implemented in **all** market analyzers (`goals`, `corners`, `cards`, `handicaps`, etc.).
+4.  **Integration & Data Flow Test:** Confirm that all modules of the "Analytical Funnel" (QSC, Weighted Metrics, Tactical Script) are seamlessly passing data to each other and to the new message formatting module.
+
+**3. Final Delivery Mandate:**
+
+The final delivered code **must** be a fully operational system. When I run the bot, it must successfully analyze games and send logical, well-reasoned tips to Telegram using the **new "Analyst Dossier" format**. The "Não encontrei mais oportunidades de valor" message should become a rare exception, not the rule.
+
+This is the final push. Your task is to deliver a complete, robust, and working product with a professional presentation.

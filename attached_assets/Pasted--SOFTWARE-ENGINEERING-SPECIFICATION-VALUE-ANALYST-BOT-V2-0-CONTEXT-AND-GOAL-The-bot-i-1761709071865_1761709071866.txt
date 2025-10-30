@@ -1,0 +1,74 @@
+**SOFTWARE ENGINEERING SPECIFICATION: VALUE ANALYST BOT V2.0**
+
+**CONTEXT AND GOAL:**
+
+The bot is a Python-based Telegram Value Betting system, utilizing the API-Football. The primary goal is to transform it into a **Virtual Human Analyst** (the "brain"), where betting decisions are based on a **Contextualized Game Script** and the detection of **Mathematical Value (Value Score)**.
+
+**PROBLEMS TO BE FIXED:**
+1.  Counter-intuitive bets (e.g., Under 2.5 goals for Bayern).
+2.  Lack of suggestions in key markets (Corners, Cards, Final Result, Handicaps).
+3.  Static Quality Score that fails to reflect current team form (the "Mirassol Problem").
+
+**FIDELITY AND STRUCTURE (CRUCIAL INSTRUCTION):**
+1.  **STRICTLY MAINTAIN THE EXISTING NOMENCLATURE.** Do not translate variable names, function names, classes, or file names from Portuguese to English. For example, `analisar_mercado_gols` MUST remain `analisar_mercado_gols`.
+2.  Maintain the existing class and function structure. Use only the already imported libraries.
+3.  The focus is on enhancing the **analytical logic** to generate bets with high confidence and a positive Value Score.
+
+---
+
+### TASK 1: DYNAMIZATION OF THE QUALITY SCORE (QSC)
+
+**Affected Files:** `analysts/context_analyzer.py` and `config.py` (for reference).
+
+**Action:** The function responsible for obtaining the Quality Score (likely in `context_analyzer.py`) must be refactored to calculate a **Composite Dynamic Quality Score (QSC)** for each team. The QSC must be a weighted average of the following components, reflecting dynamic quality:
+
+1.  **Base QS (Reputation):** The static value from `QUALITY_SCORES` in `config.py`.
+2.  **Position QS (Table):** A score derived from the current league table position (e.g., 1st place = 100, Last place = 50).
+3.  **Goal Difference QS:** A score derived from the Goal Difference (Goals Scored - Goals Conceded) in the league.
+4.  **Recent Form QS:** A score derived from the performance in the last 5 matches (e.g., 5 Wins = 100, 5 Losses = 50).
+
+**Priority:** The QSC must be the only quality score used throughout the system, replacing the static QS in all subsequent calculations.
+
+---
+
+### TASK 2: ADVANCED CONTEXTUAL ANALYSIS (STRENGTH OF SCHEDULE - SoS)
+
+**Affected Files:** `analysts/master_analyzer.py`.
+
+**Action:** The `master_analyzer` must implement **Strength of Schedule (SoS) Analysis** and calculate **Weighted Metrics**:
+
+1.  **SoS Analysis:** Analyze the last 5 matches of each team (`buscar_ultimos_jogos_time`) and use the **QSC** (calculated in TASK 1) to determine the strength of each past opponent.
+2.  **Weighted Metrics Calculation:** Calculate the averages for:
+    *   **Weighted Corners Generated/Conceded**
+    *   **Weighted Shots Generated/Conceded**
+    *   These metrics must be adjusted (weighted) by the opponent's strength (QSC) to reflect the true difficulty of the performance.
+3.  **`analysis_packet` Enhancement:** The packet must include the **QSC**, the **Weighted Metrics**, and a summary of the **Game Sequence** (SoS) for use by the market analyzers.
+
+---
+
+### TASK 3: MARKET LOGIC AND CONFIDENCE REFINEMENT
+
+**Affected Files:** All modules in `analysts/` (especially `goals_analyzer_v2.py`, `corners_analyzer.py`, `cards_analyzer.py`, etc.).
+
+**Action:** Refactor the decision logic and the `confianca` calculation in **ALL** market analyzers:
+
+1.  **Data Priority:** The analysis logic must use the **QSC** and the **Weighted Metrics** (from TASK 2) instead of simple averages.
+2.  **Confidence Calculation:** The `confianca` (0-100) must be a weighted average with the following hierarchy:
+    *   **Maximum Weight:** Value Score (detection of value in the odds).
+    *   **High Weight:** Contextual Coherence (how well the bet fits the Game Script and QSC).
+    *   **Medium Weight:** Statistical Trend (Weighted Metrics).
+3.  **Goals Correction (Under on Bayern):** The logic in `goals_analyzer_v2.py` must be revised so that the probability of an **Under** is drastically reduced for teams with high QSC and a Dominant Game Script, unless there is an extreme defensive context.
+
+---
+
+### TASK 4: TECHNICAL ERROR CORRECTION
+
+**Affected Files:** `main.py`.
+
+**Action:** Correct the `converter_odd_para_float` function:
+
+*   The fallback for invalid odds (`None`, `""`, `0`) must be changed from `1.0` to **`0.0`**. This ensures that bets without valid odds are discarded during collection, preventing Value Score distortions.
+
+**DELIVERY:**
+
+Provide the revised and complete code for all affected files, focusing on the implementation of the **Dynamic QSC** and **Weighted Metrics** to create the analytical "brain."

@@ -1,0 +1,48 @@
+Hello. We need to address the core logic of the bot's confidence calculation. The previous fix of simply lowering thresholds was insufficient. The bot is still failing to find a single valid bet in a large pool of games (e.g., 79 games), which is not a calibration issue, but a **fundamental flaw in the confidence generation logic**.
+
+**The Core Problem to Solve:**
+
+The `confianca` score the bot generates seems disconnected from the real-world probability of the event. A confidence score must be a **calibrated reflection of probability**. A "Confiança 8.0/10" should mean "I expect this event to happen roughly 80% of the time under these conditions." Currently, the bot is generating scores that are either universally low or do not accurately represent the likelihood of the outcome, causing it to discard everything.
+
+**Directive: Re-architect the Confidence Calculation Model**
+
+Your mission is to refactor the way `confianca` is calculated across all market analyzers. You must implement a new, more robust model based on a **"Base de Probabilidade Estatística"** adjusted por fatores contextuais.
+
+**The New Confidence Model Architecture:**
+
+The final `confianca` score must be a result of a clear, hierarchical calculation:
+
+**1. Step 1: Calculate the "Probabilidade Estatística Base" (The Statistical Foundation)**
+
+*   **Requirement:** For every potential bet (e.g., "Over 2.5 Gols"), you must first calculate a raw statistical probability percentage (0-100%). This is the most critical step.
+*   **How to Calculate:** This probability must be derived from the **Weighted Performance Metrics (Layer 2)**.
+    *   *Example for "Over 2.5 Gols":* Analyze the frequency of this event in the recent (weighted) history of both teams. If it happened in 75% of the relevant past games, the "Probabilidade Estatística Base" is 75%.
+    *   *Example for "Over 8.5 Cantos":* If the combined weighted average of corners is 10.2, you can model a probability distribution (like Poisson) to calculate the likelihood of having more than 8.5 corners. A simpler approach is to check the frequency this line was beaten in past games.
+*   **This is our anchor to reality.**
+
+**2. Step 2: Convert Probability to a "Confiança Base"**
+
+*   **Requirement:** Convert the 0-100% probability into a 0-10 score.
+*   **Formula:** `Confiança Base = (Probabilidade Estatística Base / 10)`.
+    *   *Example:* A 75% probability results in a `Confiança Base` of 7.5.
+
+**3. Step 3: Apply Contextual Modifiers (The "Analyst's Intuition")**
+
+*   **Requirement:** Now, adjust the `Confiança Base` using the contextual factors from our "Funil Analítico". These are modifiers, not the foundation.
+*   **Modifiers:**
+    *   **Coerência com o Roteiro Tático (Layer 3):** If the bet is coherent with the `Tactical Script` (e.g., "Over 2.5" in a "Jogo Aberto" script), apply a small bonus (e.g., `+0.5` to `+1.0`). If it's incoherent, apply a penalty (e.g., `-1.0` to `-2.0`).
+    *   **Força do "Value Score":** If the mathematical value found in the odd is very high (e.g., > 20%), apply a small bonus (e.g., `+0.5`), as it indicates a significant market inefficiency.
+    *   **Penalidade por Odd Extrema:** If the odd is very high (e.g., > 4.0), apply a small penalty (e.g., `-0.5`), as high odds inherently carry higher risk, regardless of the analysis.
+
+**4. Step 4: The Final Confidence Score**
+
+*   **Formula:** `Confiança Final = Confiança Base + Modificador_Roteiro + Modificador_Value + Penalidade_Odd`.
+*   The result must be capped between a realistic range (e.g., 1.0 to 10.0).
+
+**Why this model is superior:**
+
+This architecture ensures the `confianca` is always **anchored in statistical reality** (Step 1 & 2) and only then is it refined by the more abstract "analyst intuition" (Step 3). This prevents the bot from generating arbitrarily low or illogical scores.
+
+**Final Delivery Mandate:**
+
+You must refactor **all market analyzers** (`goals_analyzer`, `corners_analyzer`, etc.) to use this new confidence calculation model. The final code must produce calibrated confidence scores that logically reflect the probability of the events, which in turn will allow the bot to finally start generating tips. Also, perform a final integrity check to ensure no other errors will block the bot's operation.
