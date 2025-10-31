@@ -662,7 +662,7 @@ def _calculate_probabilities_from_script(script_name, power_home, power_away):
     return probabilities
 
 
-def _analyze_strength_of_schedule(team_id, league_id):
+async def _analyze_strength_of_schedule(team_id, league_id):
     """
     TASK 2: Analisa Strength of Schedule (SoS) - força dos últimos 5 adversários.
     
@@ -682,7 +682,7 @@ def _analyze_strength_of_schedule(team_id, league_id):
     from api_client import buscar_ultimos_jogos_time
     from analysts.context_analyzer import calculate_dynamic_qsc
     
-    ultimos_jogos = buscar_ultimos_jogos_time(team_id, limite=5)
+    ultimos_jogos = await buscar_ultimos_jogos_time(team_id, limite=5)
     
     if not ultimos_jogos or len(ultimos_jogos) == 0:
         return {
@@ -715,7 +715,7 @@ def _analyze_strength_of_schedule(team_id, league_id):
         
         # Buscar stats do adversário para calcular QSC
         from api_client import buscar_estatisticas_gerais_time
-        opponent_stats = buscar_estatisticas_gerais_time(opponent_id, league_id)
+        opponent_stats = await buscar_estatisticas_gerais_time(opponent_id, league_id)
         
         if opponent_stats:
             opponent_qsc = calculate_dynamic_qsc(opponent_stats, opponent_id, None, opponent_name, league_id, 0)
@@ -752,7 +752,7 @@ def _analyze_strength_of_schedule(team_id, league_id):
     }
 
 
-def _calculate_weighted_metrics(team_id, league_id, sos_data):
+async def _calculate_weighted_metrics(team_id, league_id, sos_data):
     """
     TASK 2: Calcula métricas ponderadas por força do adversário (SoS).
     
@@ -773,7 +773,7 @@ def _calculate_weighted_metrics(team_id, league_id, sos_data):
     """
     from api_client import buscar_ultimos_jogos_time, buscar_estatisticas_gerais_time
     
-    ultimos_jogos = buscar_ultimos_jogos_time(team_id, limite=5)
+    ultimos_jogos = await buscar_ultimos_jogos_time(team_id, limite=5)
     
     if not ultimos_jogos:
         return {
@@ -828,7 +828,7 @@ def _calculate_weighted_metrics(team_id, league_id, sos_data):
     }
 
 
-def generate_match_analysis(jogo):
+async def generate_match_analysis(jogo):
     """
     FUNÇÃO PRINCIPAL - Gera análise completa centralizada do jogo.
     TASK 2: Agora com SoS Analysis e Weighted Metrics integrados.
@@ -882,7 +882,7 @@ def generate_match_analysis(jogo):
             print("   🔄 SEGUNDO JOGO - Buscando resultado do jogo de ida...")
             
             # Buscar resultado do 1º jogo via API
-            first_leg = buscar_jogo_de_ida_knockout(home_team_id, away_team_id, league_id)
+            first_leg = await buscar_jogo_de_ida_knockout(home_team_id, away_team_id, league_id)
             
             if first_leg:
                 print(f"   ✅ Jogo de ida encontrado: {first_leg['home_goals']} x {first_leg['away_goals']}")
@@ -895,11 +895,11 @@ def generate_match_analysis(jogo):
                 from analysts.context_analyzer import calculate_dynamic_qsc
                 from api_client import buscar_classificacao_liga
                 
-                classificacao_temp = buscar_classificacao_liga(league_id)
+                classificacao_temp = await buscar_classificacao_liga(league_id)
                 
                 # Buscar stats temporariamente para QSC
-                home_stats_temp = buscar_estatisticas_gerais_time(home_team_id, league_id)
-                away_stats_temp = buscar_estatisticas_gerais_time(away_team_id, league_id)
+                home_stats_temp = await buscar_estatisticas_gerais_time(home_team_id, league_id)
+                away_stats_temp = await buscar_estatisticas_gerais_time(away_team_id, league_id)
                 
                 qsc_home_temp = calculate_dynamic_qsc(home_stats_temp, home_team_id, classificacao_temp, home_team_name, league_id, rodada_atual) if home_stats_temp else 50
                 qsc_away_temp = calculate_dynamic_qsc(away_stats_temp, away_team_id, classificacao_temp, away_team_name, league_id, rodada_atual) if away_stats_temp else 50
@@ -951,17 +951,17 @@ def generate_match_analysis(jogo):
     
     print("📊 Buscando estatísticas dos times...")
     print(f"  🔍 Home ID: {home_team_id} | League ID: {league_id} | Rodada: {rodada_atual}")
-    home_stats = buscar_estatisticas_gerais_time(home_team_id, league_id)
+    home_stats = await buscar_estatisticas_gerais_time(home_team_id, league_id)
     print(f"  🏠 Home stats: {'OK' if home_stats else 'NONE'}")
     
     print(f"  🔍 Away ID: {away_team_id} | League ID: {league_id}")
-    away_stats = buscar_estatisticas_gerais_time(away_team_id, league_id)
+    away_stats = await buscar_estatisticas_gerais_time(away_team_id, league_id)
     print(f"  ✈️ Away stats: {'OK' if away_stats else 'NONE'}")
     
     # Buscar classificação para QSC dinâmico
     print("📊 Buscando classificação da liga...")
     from api_client import buscar_classificacao_liga
-    classificacao = buscar_classificacao_liga(league_id)
+    classificacao = await buscar_classificacao_liga(league_id)
     
     if not home_stats or not away_stats:
         print(f"  ❌ STATS MISSING - Home: {bool(home_stats)} | Away: {bool(away_stats)}")
@@ -989,12 +989,12 @@ def generate_match_analysis(jogo):
     print(f"  🔥 Momento Casa: {moment_home} | Momento Fora: {moment_away}")
     
     print("📅 TASK 2: Analisando Strength of Schedule (SoS)...")
-    sos_home = _analyze_strength_of_schedule(home_team_id, league_id)
-    sos_away = _analyze_strength_of_schedule(away_team_id, league_id)
+    sos_home = await _analyze_strength_of_schedule(home_team_id, league_id)
+    sos_away = await _analyze_strength_of_schedule(away_team_id, league_id)
     
     print("⚖️ TASK 2: Calculando Weighted Metrics (Métricas Ponderadas)...")
-    weighted_home = _calculate_weighted_metrics(home_team_id, league_id, sos_home)
-    weighted_away = _calculate_weighted_metrics(away_team_id, league_id, sos_away)
+    weighted_home = await _calculate_weighted_metrics(home_team_id, league_id, sos_home)
+    weighted_away = await _calculate_weighted_metrics(away_team_id, league_id, sos_away)
     print(f"  📊 Casa: {weighted_home['weighted_corners_for']:.1f} cantos | {weighted_home['weighted_shots_for']:.1f} finalizações (ponderado)")
     print(f"  📊 Fora: {weighted_away['weighted_corners_for']:.1f} cantos | {weighted_away['weighted_shots_for']:.1f} finalizações (ponderado)")
     

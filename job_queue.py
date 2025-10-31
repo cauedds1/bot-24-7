@@ -137,7 +137,7 @@ async def background_analysis_worker(db_manager: DatabaseManager):
                     
                     logger.info(f"🔍 Analisando fixture {fixture_id}...")
                     
-                    analysis_packet = await asyncio.to_thread(generate_match_analysis, jogo)
+                    analysis_packet = await generate_match_analysis(jogo)
                     
                     dossier_json = json.dumps(analysis_packet, ensure_ascii=False)
                     

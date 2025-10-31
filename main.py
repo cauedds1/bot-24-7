@@ -399,7 +399,7 @@ async def gerar_analise_completa_todos_mercados(jogo):
     
     # 1️⃣ CHAMAR MASTER ANALYZER - CÉREBRO CENTRAL
     print("--- 🧠 CALLING MASTER ANALYZER ---")
-    analysis_packet = generate_match_analysis(jogo)
+    analysis_packet = await generate_match_analysis(jogo)
     
     if 'error' in analysis_packet:
         print(f"--- ❌ MASTER ANALYZER ERROR: {analysis_packet['error']} ---")
@@ -821,7 +821,7 @@ async def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=No
             game_script = "FAVORITISMO_CASA" if home_quality > away_quality else "FAVORITISMO_VISITANTE"
 
         # Buscar análise master para contexto tático
-        analysis_packet = generate_match_analysis(jogo)
+        analysis_packet = await generate_match_analysis(jogo)
         
         analises_brutas = [
             analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, game_script),
@@ -1130,7 +1130,7 @@ async def coletar_todos_palpites_disponiveis():
             game_script = "FAVORITISMO_CASA" if home_quality > away_quality else "FAVORITISMO_VISITANTE"
 
         # Buscar análise master para contexto tático
-        analysis_packet = generate_match_analysis(jogo)
+        analysis_packet = await generate_match_analysis(jogo)
         
         # Analisar todos os mercados COM OS PARÂMETROS CORRETOS
         analise_gols = analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, game_script)
