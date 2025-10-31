@@ -354,7 +354,7 @@ def gerar_narrativa_palpite(sugestao, stats_casa, stats_fora, nome_casa, nome_fo
     return f"📖 <b>Análise:</b> {narrativa}\n"
 
 
-def gerar_analise_completa_todos_mercados(jogo):
+async def gerar_analise_completa_todos_mercados(jogo):
     """
     🧠 NEW ARCHITECTURE: Gera análise COMPLETA usando Master Analyzer.
     Master Analyzer cria análise centralizada, analyzers especializados consomem o output.
@@ -374,8 +374,8 @@ def gerar_analise_completa_todos_mercados(jogo):
     print(f"--- ✅ MASTER ANALYZER COMPLETE - Script: {analysis_packet['analysis_summary']['selected_script']} ---")
     
     # 2️⃣ BUSCAR DADOS ADICIONAIS (odds, classificação)
-    odds = buscar_odds_do_jogo(id_jogo)
-    classificacao = buscar_classificacao_liga(id_liga)
+    odds = await buscar_odds_do_jogo(id_jogo)
+    classificacao = await buscar_classificacao_liga(id_liga)
     
     # Extrair posições da classificação
     pos_casa = "N/A"
@@ -681,7 +681,7 @@ def detectar_diferenca_tecnica(jogo, classificacao, pos_casa, pos_fora):
     return alerta
 
 
-def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
+async def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
     id_jogo = jogo['fixture']['id']
     id_liga = jogo['league']['id']
     usar_cache_otimizado = False
@@ -742,9 +742,9 @@ def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
 
     # Se não achou no banco, fazer análise completa
     if not analise_db:
-        stats_casa = buscar_estatisticas_gerais_time(jogo['teams']['home']['id'], id_liga)
-        stats_fora = buscar_estatisticas_gerais_time(jogo['teams']['away']['id'], id_liga)
-        odds = buscar_odds_do_jogo(id_jogo)
+        stats_casa = await buscar_estatisticas_gerais_time(jogo['teams']['home']['id'], id_liga)
+        stats_fora = await buscar_estatisticas_gerais_time(jogo['teams']['away']['id'], id_liga)
+        odds = await buscar_odds_do_jogo(id_jogo)
 
         if not stats_casa or not stats_fora or not odds:
             if not stats_casa:
@@ -755,7 +755,7 @@ def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
                 print(f"⚠️  SEM ODDS: Jogo {id_jogo}")
             return None
 
-        classificacao = buscar_classificacao_liga(id_liga)
+        classificacao = await buscar_classificacao_liga(id_liga)
         pos_casa = "N/A"
         pos_fora = "N/A"
 
@@ -1038,12 +1038,12 @@ def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
 
     return mensagem_final
 
-def coletar_todos_palpites_disponiveis():
+async def coletar_todos_palpites_disponiveis():
     """
     Coleta TODOS os palpites de TODOS os jogos e TODOS os mercados.
     Retorna lista de dicts com: {jogo, palpite, time_casa, time_fora, liga, horario}
     """
-    jogos = buscar_jogos_do_dia()
+    jogos = await buscar_jogos_do_dia()
     if not jogos:
         return []
 
@@ -1066,12 +1066,12 @@ def coletar_todos_palpites_disponiveis():
             time_fora_id = jogo['teams']['away']['id']
             liga_id = jogo['league']['id']
 
-            stats_casa = buscar_estatisticas_gerais_time(time_casa_id, liga_id)
-            stats_fora = buscar_estatisticas_gerais_time(time_fora_id, liga_id)
-            classificacao = buscar_classificacao_liga(liga_id)
+            stats_casa = await buscar_estatisticas_gerais_time(time_casa_id, liga_id)
+            stats_fora = await buscar_estatisticas_gerais_time(time_fora_id, liga_id)
+            classificacao = await buscar_classificacao_liga(liga_id)
 
         # Buscar odds do jogo
-        odds = buscar_odds_do_jogo(fixture_id)
+        odds = await buscar_odds_do_jogo(fixture_id)
 
         if not stats_casa or not stats_fora or not odds:
             continue
@@ -1173,12 +1173,12 @@ def calcular_valor_palpite(palpite_data):
 
     return valor
 
-def gerar_aposta_simples():
+async def gerar_aposta_simples():
     """
     Gera UMA ÚNICA aposta de alta confiança de TODOS os jogos/mercados.
     Usa sistema de pontuação de VALOR (não aleatório).
     """
-    todos_palpites = coletar_todos_palpites_disponiveis()
+    todos_palpites = await coletar_todos_palpites_disponiveis()
 
     if not todos_palpites:
         return None
@@ -1208,12 +1208,12 @@ def gerar_aposta_simples():
 
     return escolhido
 
-def gerar_multipla_inteligente(min_jogos, max_jogos):
+async def gerar_multipla_inteligente(min_jogos, max_jogos):
     """
     Gera múltipla com N jogos usando seleções coerentes e de alta confiança.
     Prioriza palpites com MELHOR VALOR (relação confiança/odd).
     """
-    todos_palpites = coletar_todos_palpites_disponiveis()
+    todos_palpites = await coletar_todos_palpites_disponiveis()
 
     if not todos_palpites:
         return []
@@ -1266,7 +1266,7 @@ def gerar_multipla_inteligente(min_jogos, max_jogos):
 
     return [p[0] for p in pool_candidatos[:num_jogos]]
 
-def gerar_bingo_odd_alta(odd_min, odd_max):
+async def gerar_bingo_odd_alta(odd_min, odd_max):
     """
     Gera múltipla com odd total entre odd_min e odd_max.
     ESTRATÉGIA INTELIGENTE:
@@ -1275,7 +1275,7 @@ def gerar_bingo_odd_alta(odd_min, odd_max):
     - Prefere VOLUME com valor (muitos jogos @1.30-1.80)
     - Usa algoritmo de otimização para melhor combinação
     """
-    todos_palpites = coletar_todos_palpites_disponiveis()
+    todos_palpites = await coletar_todos_palpites_disponiveis()
 
     if not todos_palpites:
         return []
@@ -1484,8 +1484,8 @@ async def processar_um_jogo(jogo, idx_total, filtro_mercado, filtro_tipo_linha):
         return analise_cached if analise_cached else None
 
     print(f"⚙️  PROCESSANDO: Jogo {idx_total} (ID {jogo['fixture']['id']})")
-    # Executar gerar_palpite_completo em thread separada para permitir concorrência real
-    palpite = await asyncio.to_thread(gerar_palpite_completo, jogo, filtro_mercado, filtro_tipo_linha)
+    # Executar gerar_palpite_completo diretamente (já é async)
+    palpite = await gerar_palpite_completo(jogo, filtro_mercado, filtro_tipo_linha)
     return palpite if palpite else None
 
 async def processar_analises_em_background(sessao_id, jogos, filtro_mercado, filtro_tipo_linha):
@@ -1661,7 +1661,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await query.edit_message_text(text="Buscando a lista de jogos do dia...")
             print("🔵 CHAMANDO: buscar_jogos_do_dia()")
 
-            jogos_encontrados = await asyncio.to_thread(buscar_jogos_do_dia)
+            jogos_encontrados = await buscar_jogos_do_dia()
 
             print(f"🔵 RESULTADO: {len(jogos_encontrados) if jogos_encontrados else 0} jogos encontrados")
 
@@ -1698,7 +1698,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         liga_id = int(data.split('_')[1])
 
         await query.edit_message_text(text="Buscando jogos da liga...")
-        jogos_liga = await asyncio.to_thread(buscar_jogos_por_liga, liga_id)
+        jogos_liga = await buscar_jogos_por_liga(liga_id)
 
         if not jogos_liga:
             await query.edit_message_text(text="Não encontrei jogos desta liga para hoje.")
@@ -1853,7 +1853,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     elif data == 'buscar_jogo':
         await query.edit_message_text(text="🔍 Carregando ligas disponíveis...")
-        ligas = await asyncio.to_thread(buscar_ligas_disponiveis_hoje)
+        ligas = await buscar_ligas_disponiveis_hoje()
         
         if not ligas:
             keyboard = [[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data='voltar_menu')]]
@@ -1871,7 +1871,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     elif data == 'stats_dia':
         await query.edit_message_text(text="📅 Carregando jogos do dia...")
-        jogos = await asyncio.to_thread(buscar_jogos_do_dia)
+        jogos = await buscar_jogos_do_dia()
 
         if not jogos:
             await query.edit_message_text(text="❌ Não encontrei jogos para hoje.")
@@ -1995,7 +1995,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     elif data == 'aposta_simples':
         await query.edit_message_text(text="🎲 Gerando aposta simples...")
-        aposta = await asyncio.to_thread(gerar_aposta_simples)
+        aposta = await gerar_aposta_simples()
 
         if not aposta:
             await query.edit_message_text(text="❌ Não encontrei jogos disponíveis para gerar aposta simples.")
@@ -2052,7 +2052,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         max_jogos = int(parts[2])
 
         await query.edit_message_text(text=f"🎰 Montando múltipla com {min_jogos}-{max_jogos} jogos...")
-        multipla = await asyncio.to_thread(gerar_multipla_inteligente, min_jogos, max_jogos)
+        multipla = await gerar_multipla_inteligente(min_jogos, max_jogos)
 
         if not multipla:
             await query.edit_message_text(text="❌ Não encontrei jogos suficientes para criar a múltipla.")
@@ -2112,7 +2112,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         odd_max = int(parts[2])
 
         await query.edit_message_text(text=f"🎯 Montando BINGO com odd {odd_min}-{odd_max}...")
-        bingo = await asyncio.to_thread(gerar_bingo_odd_alta, odd_min, odd_max)
+        bingo = await gerar_bingo_odd_alta(odd_min, odd_max)
 
         if not bingo:
             await query.edit_message_text(text="❌ Não encontrei jogos suficientes para criar o bingo.")
@@ -2239,7 +2239,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.edit_message_text(text="⏳ Carregando jogos da liga...")
         
         # Buscar todos os jogos do dia e filtrar pela liga
-        jogos = await asyncio.to_thread(buscar_jogos_do_dia)
+        jogos = await buscar_jogos_do_dia()
         jogos_liga = [j for j in jogos if j['league']['id'] == liga_id]
         
         if not jogos_liga:
@@ -2290,7 +2290,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         # Realizar análise COMPLETA com TODOS os mercados (APENAS deste jogo)
         print(f"--- 🎯 BUSCAR JOGO: Analisando APENAS Fixture #{jogo_id} ---")
-        analise_completa = await asyncio.to_thread(gerar_analise_completa_todos_mercados, jogo)
+        analise_completa = await gerar_analise_completa_todos_mercados(jogo)
         print(f"--- ✅ BUSCAR JOGO: Análise retornada (sucesso: {bool(analise_completa)}) ---")
         
         if analise_completa:
@@ -2441,6 +2441,13 @@ async def post_init(application: Application) -> None:
     asyncio.create_task(job_queue.background_analysis_worker(db_manager))
     print("✅ Background worker iniciado!")
 
+async def post_shutdown(application: Application) -> None:
+    """Função executada no shutdown do bot para limpar recursos"""
+    print("🛑 Fechando conexões HTTP...")
+    import api_client
+    await api_client.close_http_client()
+    print("✅ Conexões HTTP fechadas!")
+
 def main() -> None:
     if not TELEGRAM_TOKEN:
         print("ERRO CRÍTICO: O 'TELEGRAM_BOT_TOKEN' não foi encontrado.")
@@ -2448,7 +2455,7 @@ def main() -> None:
 
     cache_manager.load_cache_from_disk()
 
-    application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).build()
+    application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).post_shutdown(post_shutdown).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("limpar_cache", limpar_cache_command))
     application.add_handler(CommandHandler("getlog", getlog_command))

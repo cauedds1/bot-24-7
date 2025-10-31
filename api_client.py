@@ -1,6 +1,6 @@
 # api_client.py
-import requests
-import time
+import httpx
+import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import cache_manager
@@ -15,6 +15,13 @@ HEADERS = {
     "x-rapidapi-host": "v3.football.api-sports.io",
     "x-rapidapi-key": os.getenv("API_FOOTBALL_KEY")
 }
+
+# Cliente HTTP assíncrono global
+http_client = httpx.AsyncClient(timeout=10.0, headers=HEADERS)
+
+async def close_http_client():
+    """Fecha o cliente HTTP para evitar vazamento de conexões."""
+    await http_client.aclose()
 
 # ============================================
 # LIGAS DE INTERESSE - COBERTURA GLOBAL
@@ -440,7 +447,7 @@ NOMES_LIGAS_PT = {
     202: ("🇹🇳 Ligue Professionnelle 1", "Tunísia"),
 }
 
-def get_current_season(league_id):
+async def get_current_season(league_id):
     """
     Determina dinamicamente a temporada atual de uma liga usando a API.
     
@@ -456,11 +463,9 @@ def get_current_season(league_id):
         return str(cached_season)
     
     try:
-        response = requests.get(
+        response = await http_client.get(
             f"{API_URL}leagues",
-            headers=HEADERS,
-            params={"id": league_id, "current": "true"},
-            timeout=10
+            params={"id": league_id, "current": "true"}
         )
         
         if response.status_code == 200:
@@ -488,7 +493,7 @@ def get_current_season(league_id):
     
     return fallback_season
 
-def buscar_jogos_do_dia():
+async def buscar_jogos_do_dia():
     # Obter hora atual no horário de Brasília
     brasilia_tz = ZoneInfo("America/Sao_Paulo")
     agora_brasilia = datetime.now(brasilia_tz)
@@ -539,7 +544,7 @@ def buscar_jogos_do_dia():
                 print(f"   [DEBUG] URL: {API_URL}fixtures")
             
             try:
-                response = requests.get(API_URL + "fixtures", headers=HEADERS, params=params, timeout=10)
+                response = await http_client.get(API_URL + "fixtures", params=params)
                 response.raise_for_status()
 
                 if data := response.json():
@@ -547,10 +552,10 @@ def buscar_jogos_do_dia():
                         jogos_novos = len(data['response'])
                         todos_os_jogos.extend(data['response'])
                         print(f"  [{idx}/{len(LIGAS_DE_INTERESSE)}] Liga {liga_id}: +{jogos_novos} jogos (Total: {len(todos_os_jogos)})")
-            except requests.exceptions.Timeout:
+            except httpx.TimeoutException:
                 print(f"  [{idx}/{len(LIGAS_DE_INTERESSE)}] Liga {liga_id}: TIMEOUT")
                 continue
-            except requests.exceptions.RequestException as e:
+            except httpx.HTTPError as e:
                 print(f"  [{idx}/{len(LIGAS_DE_INTERESSE)}] Liga {liga_id}: ERRO - {str(e)[:50]}")
                 continue
 
@@ -561,7 +566,7 @@ def buscar_jogos_do_dia():
         for idx, liga_id in enumerate(LIGAS_DE_INTERESSE, 1):
             params = {"league": str(liga_id), "season": season, "date": amanha_brt, "status": "NS"}
             try:
-                response = requests.get(API_URL + "fixtures", headers=HEADERS, params=params, timeout=10)
+                response = await http_client.get(API_URL + "fixtures", params=params)
                 response.raise_for_status()
 
                 if data := response.json():
@@ -579,17 +584,17 @@ def buscar_jogos_do_dia():
     cache_manager.set(cache_key, todos_os_jogos)  # Usa padrão de 240 min (4h)
     return todos_os_jogos
 
-def buscar_classificacao_liga(id_liga: int):
+async def buscar_classificacao_liga(id_liga: int):
     cache_key = f"classificacao_{id_liga}"
     if cached_data := cache_manager.get(cache_key): return cached_data
     
-    season = get_current_season(id_liga)
+    season = await get_current_season(id_liga)
     
     params = {"league": str(id_liga), "season": season}
     try:
-        time.sleep(1.6)
+        await asyncio.sleep(1.6)
         print(f"  🔍 Buscando classificação: Liga {id_liga}, Season {season}")
-        response = requests.get(API_URL + "standings", headers=HEADERS, params=params, timeout=10)
+        response = await http_client.get(API_URL + "standings", params=params)
         response.raise_for_status()
         if data := response.json().get('response'):
             if data and data[0]['league']['standings']:
@@ -602,16 +607,16 @@ def buscar_classificacao_liga(id_liga: int):
         print(f"  ❌ Erro ao buscar classificação: {str(e)[:100]}")
     return None
 
-def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
+async def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
     cache_key = f"stats_{time_id}_liga_{id_liga}"
     if cached_data := cache_manager.get(cache_key): return cached_data
 
-    season = get_current_season(id_liga)
+    season = await get_current_season(id_liga)
 
     params = {"team": str(time_id), "league": str(id_liga), "season": season}
     try:
-        time.sleep(1.6)
-        response = requests.get(API_URL + "teams/statistics", headers=HEADERS, params=params, timeout=10)
+        await asyncio.sleep(1.6)
+        response = await http_client.get(API_URL + "teams/statistics", params=params)
         response.raise_for_status()
 
         response_data = response.json()
@@ -678,7 +683,7 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
 
         if cantos_avg_casa == 0.0 and cantos_avg_fora == 0.0:
             print(f"  🔄 FALLBACK: API retornou 0.0, buscando estatísticas dos últimos jogos...")
-            ultimos_jogos = buscar_ultimos_jogos_time(time_id, limite=5)
+            ultimos_jogos = await buscar_ultimos_jogos_time(time_id, limite=5)
 
             if ultimos_jogos:
                 cantos_feitos_casa_soma = 0
@@ -707,7 +712,7 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
                     if not stats or not fixture_id:
                         # Tentar buscar estatísticas detalhadas
                         print(f"     🔍 DEBUG: Buscando stats para fixture {fixture_id}...")
-                        stats_detalhadas = buscar_estatisticas_jogo(fixture_id)
+                        stats_detalhadas = await buscar_estatisticas_jogo(fixture_id)
                         if stats_detalhadas:
                             stats = stats_detalhadas
                             print(f"     ✅ DEBUG: Stats encontradas para fixture {fixture_id}")
@@ -851,14 +856,14 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
         cache_manager.set(cache_key, analise)
         return analise
 
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         print(f"  ⏱️ TIMEOUT buscando stats do time {time_id}")
         return None
     except Exception as e:
         print(f"  ❌ ERRO buscando stats do time {time_id}: {e}")
         return None
 
-def buscar_jogo_de_ida_knockout(home_team_id: int, away_team_id: int, league_id: int):
+async def buscar_jogo_de_ida_knockout(home_team_id: int, away_team_id: int, league_id: int):
     """
     Busca o jogo de ida de uma eliminatória (1st Leg) entre dois times.
     
@@ -883,8 +888,8 @@ def buscar_jogo_de_ida_knockout(home_team_id: int, away_team_id: int, league_id:
     params = {"h2h": f"{home_team_id}-{away_team_id}", "league": str(league_id), "last": "3"}
     
     try:
-        time.sleep(1.6)
-        response = requests.get(API_URL + "fixtures/headtohead", headers=HEADERS, params=params, timeout=10)
+        await asyncio.sleep(1.6)
+        response = await http_client.get(API_URL + "fixtures/headtohead", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -931,7 +936,7 @@ def buscar_jogo_de_ida_knockout(home_team_id: int, away_team_id: int, league_id:
         print(f"  ❌ ERRO buscando jogo de ida: {e}")
         return None
 
-def buscar_h2h(time1_id: int, time2_id: int, limite: int = 5):
+async def buscar_h2h(time1_id: int, time2_id: int, limite: int = 5):
     """
     Busca histórico de confrontos diretos (H2H) entre dois times.
     
@@ -949,8 +954,8 @@ def buscar_h2h(time1_id: int, time2_id: int, limite: int = 5):
     
     params = {"h2h": f"{time1_id}-{time2_id}", "last": str(limite)}
     try:
-        time.sleep(1.6)
-        response = requests.get(API_URL + "fixtures/headtohead", headers=HEADERS, params=params, timeout=10)
+        await asyncio.sleep(1.6)
+        response = await http_client.get(API_URL + "fixtures/headtohead", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -986,7 +991,7 @@ def buscar_h2h(time1_id: int, time2_id: int, limite: int = 5):
         print(f"  ❌ ERRO buscando H2H: {e}")
         return []
 
-def buscar_ultimos_jogos_time(time_id: int, limite: int = 5, _tentativa: int = 1):
+async def buscar_ultimos_jogos_time(time_id: int, limite: int = 5, _tentativa: int = 1):
     """
     Busca últimos jogos FINALIZADOS de um time.
     Se não encontrar jogos finalizados, aumenta automaticamente o limite (retry).
@@ -1009,8 +1014,8 @@ def buscar_ultimos_jogos_time(time_id: int, limite: int = 5, _tentativa: int = 1
 
     params = {"team": str(time_id), "season": season, "last": str(limite)}
     try:
-        time.sleep(1.6)
-        response = requests.get(API_URL + "fixtures", headers=HEADERS, params=params, timeout=10)
+        await asyncio.sleep(1.6)
+        response = await http_client.get(API_URL + "fixtures", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -1064,7 +1069,7 @@ def buscar_ultimos_jogos_time(time_id: int, limite: int = 5, _tentativa: int = 1
             if len(jogos_processados) == 0 and _tentativa < 3:
                 novo_limite = limite * 2  # Dobrar limite
                 print(f"\n     🔄 RETRY: Nenhum jogo finalizado encontrado, tentando com {novo_limite} jogos...")
-                return buscar_ultimos_jogos_time(time_id, limite=novo_limite, _tentativa=_tentativa + 1)
+                return await buscar_ultimos_jogos_time(time_id, limite=novo_limite, _tentativa=_tentativa + 1)
             
             # ⚠️ GUARDRAIL: Se após 3 tentativas ainda não há jogos finalizados
             if len(jogos_processados) == 0:
@@ -1155,7 +1160,7 @@ def normalizar_odds(odds_formatadas):
 
     return odds_normalizadas
 
-def buscar_odds_do_jogo(id_jogo: int):
+async def buscar_odds_do_jogo(id_jogo: int):
     cache_key = f"odds_{id_jogo}"
     if cached_data := cache_manager.get(cache_key): return cached_data
 
@@ -1163,8 +1168,8 @@ def buscar_odds_do_jogo(id_jogo: int):
     odds_formatadas = {}
 
     try:
-        time.sleep(1.6)
-        response = requests.get(API_URL + "odds", headers=HEADERS, params=params, timeout=10)
+        await asyncio.sleep(1.6)
+        response = await http_client.get(API_URL + "odds", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -1226,7 +1231,7 @@ def buscar_odds_do_jogo(id_jogo: int):
                 elif "Handicap" in bet_name or "Spread" in bet_name:
                     odds_formatadas["handicap"] = {v['value']: float(v['odd']) for v in values_raw}
 
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         print(f"  ⏱️ TIMEOUT buscando odds do jogo {id_jogo}")
     except Exception as e:
         print(f"  ⚠️ Erro ao buscar odds do jogo {id_jogo}: {e}")
@@ -1239,9 +1244,9 @@ def buscar_odds_do_jogo(id_jogo: int):
 
     return {}
 
-def buscar_ligas_disponiveis_hoje():
+async def buscar_ligas_disponiveis_hoje():
     """Retorna lista de ligas que têm jogos hoje, ORDENADAS POR PAÍS."""
-    jogos = buscar_jogos_do_dia()
+    jogos = await buscar_jogos_do_dia()
     if not jogos:
         return []
 
@@ -1288,12 +1293,12 @@ def buscar_todas_ligas_suportadas():
     
     return ligas_ordenadas
 
-def buscar_jogos_por_liga(liga_id: int):
+async def buscar_jogos_por_liga(liga_id: int):
     """Retorna jogos de uma liga específica para hoje."""
-    jogos_todos = buscar_jogos_do_dia()
+    jogos_todos = await buscar_jogos_do_dia()
     return [jogo for jogo in jogos_todos if jogo['league']['id'] == liga_id]
 
-def buscar_estatisticas_jogo(fixture_id: int):
+async def buscar_estatisticas_jogo(fixture_id: int):
     """Busca estatísticas detalhadas de um jogo específico (cantos, cartões, finalizações, etc)."""
     cache_key = f"stats_jogo_{fixture_id}"
     if cached_data := cache_manager.get(cache_key):
@@ -1301,8 +1306,8 @@ def buscar_estatisticas_jogo(fixture_id: int):
 
     params = {"fixture": str(fixture_id)}
     try:
-        time.sleep(1.6)
-        response = requests.get(API_URL + "fixtures/statistics", headers=HEADERS, params=params, timeout=10)
+        await asyncio.sleep(1.6)
+        response = await http_client.get(API_URL + "fixtures/statistics", params=params)
         response.raise_for_status()
         
         response_json = response.json()
