@@ -457,7 +457,29 @@ def gerar_analise_completa_todos_mercados(jogo):
             continue
         
         for palpite in analise['palpites'][:3]:  # Pegar top 3 de cada mercado
-            # FILTRAR: Ignorar palpites sem odd válida
+            # ========== DIVERGENT LOGIC: Check if Tactical Tip ==========
+            is_tactical = palpite.get('is_tactical', False)
+            
+            if is_tactical:
+                # TACTICAL TIP: Exempt from odd validation
+                print(f"  🧠 Tactical Tip detectado: {mercado_nome} - {palpite.get('tipo')} (Conf: {palpite.get('confianca')}/10)")
+                
+                # Use confiança como métrica de prioridade (normalizada para escala similar ao value_score)
+                # Confiança 10/10 = value_score equivalente de ~0.5 (médio-alto)
+                # Isso permite que tactical tips de alta confiança compitam com bets de value médio
+                tactical_priority = palpite.get('confianca', 5) / 20.0  # 10/10 -> 0.5, 8/10 -> 0.4
+                
+                todos_palpites_com_value.append({
+                    'mercado_nome': mercado_nome,
+                    'mercado_emoji': mercado_emoji,
+                    'palpite': palpite,
+                    'value_score': tactical_priority,
+                    'bot_probability': palpite.get('confianca', 0) / 10.0,
+                    'is_tactical': True
+                })
+                continue  # Pular validação de odds
+            
+            # REGULAR BET: Validate odd and calculate value
             odd = palpite.get('odd')
             if odd is None or odd == 'N/A' or odd == '':
                 print(f"  ⚠️ Palpite ignorado (odd inválida): {mercado_nome} - {palpite.get('tipo')}")
@@ -483,7 +505,8 @@ def gerar_analise_completa_todos_mercados(jogo):
                 'mercado_emoji': mercado_emoji,
                 'palpite': palpite,
                 'value_score': value_score,
-                'bot_probability': bot_prob
+                'bot_probability': bot_prob,
+                'is_tactical': False
             })
     
     # Ordenar por Value Score (maior primeiro)
