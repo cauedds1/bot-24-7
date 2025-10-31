@@ -26,6 +26,8 @@ from analysts.handicaps_analyzer import analisar_mercado_handicaps
 from analysts.context_analyzer import filtrar_mercados_por_contexto, get_quality_scores
 from analysts.value_detector import detectar_valor_contextual, calculate_value_score, format_value_percentage, get_value_rating
 from analysts.justification_generator import generate_persuasive_justification
+import job_queue
+import pagination_helpers
 
 load_dotenv()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -2093,6 +2095,53 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         ]
         await query.edit_message_text(text=mensagem, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
+    elif data.startswith('page_'):
+        parts = data.split('_')
+        analysis_type = parts[1]
+        page = int(parts[2])
+        user_id = query.from_user.id
+        
+        paginated = pagination_helpers.get_paginated_analyses(
+            db_manager, user_id, analysis_type, page
+        )
+        
+        if not paginated['analyses']:
+            await query.edit_message_text(
+                text="Nenhuma análise encontrada. Use o menu principal para iniciar uma análise.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")
+                ]])
+            )
+            return
+        
+        from analysts.dossier_formatter import format_phoenix_dossier
+        
+        for analysis_row in paginated['analyses']:
+            dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
+            formatted_msg = format_phoenix_dossier(dossier)
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=formatted_msg,
+                parse_mode='HTML'
+            )
+        
+        keyboard = pagination_helpers.create_pagination_keyboard(
+            paginated['current_page'],
+            paginated['has_more'],
+            analysis_type,
+            paginated['total_pages']
+        )
+        
+        status_msg = f"📊 Mostrando {len(paginated['analyses'])} de {paginated['total']} análises"
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=status_msg,
+            reply_markup=keyboard
+        )
+    
+    elif data == 'noop':
+        await query.answer()
+    
     elif data == 'voltar_menu':
         keyboard = [
             [InlineKeyboardButton("🎯 Análise Completa", callback_data='analise_completa'), 
@@ -2326,6 +2375,12 @@ async def mostrar_pagina_ligas(query, context: ContextTypes.DEFAULT_TYPE):
     mensagem = f"<b>🏆 Selecione uma Liga</b>\n\nPágina {pagina_atual + 1} de {(len(ligas) - 1) // LIGAS_POR_PAGINA + 1}"
     await query.edit_message_text(text=mensagem, reply_markup=reply_markup, parse_mode='HTML')
 
+async def post_init(application: Application) -> None:
+    """Função executada após inicialização do bot para iniciar background worker"""
+    print("🚀 Iniciando background analysis worker...")
+    asyncio.create_task(job_queue.background_analysis_worker(db_manager))
+    print("✅ Background worker iniciado!")
+
 def main() -> None:
     if not TELEGRAM_TOKEN:
         print("ERRO CRÍTICO: O 'TELEGRAM_BOT_TOKEN' não foi encontrado.")
@@ -2333,14 +2388,14 @@ def main() -> None:
 
     cache_manager.load_cache_from_disk()
 
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("limpar_cache", limpar_cache_command))
     application.add_handler(CommandHandler("getlog", getlog_command))
     application.add_handler(CallbackQueryHandler(button_handler))
 
     print(f"AnalytipsBot iniciado! Escutando...")
-    application.run_polling()
+    application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     main()

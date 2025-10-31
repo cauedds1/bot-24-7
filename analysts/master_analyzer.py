@@ -55,6 +55,7 @@ def _calculate_moment_score(team_stats):
     # Ajuste por gols recentes
     goals = team_stats.get('goals', {})
     goals_avg = goals.get('for', {}).get('average', {}).get('total', 0)
+    goals_avg = float(goals_avg) if goals_avg else 0.0
     
     if goals_avg > 2.5:
         moment = min(moment + 10, 100)  # Ataque potente
@@ -145,7 +146,9 @@ def _calculate_tactical_profile(team_stats):
     
     # Análise de estilo ofensivo baseado em gols
     goals_for_avg = team_stats.get('goals', {}).get('for', {}).get('average', {}).get('total', 0)
+    goals_for_avg = float(goals_for_avg) if goals_for_avg else 0.0
     goals_against_avg = team_stats.get('goals', {}).get('against', {}).get('average', {}).get('total', 0)
+    goals_against_avg = float(goals_against_avg) if goals_against_avg else 0.0
     
     # Classificar estilo tático
     if goals_for_avg > 1.8:
@@ -1008,7 +1011,9 @@ def generate_match_analysis(jogo):
         print(f"  🔥 Fator dominante detectado: {contextual_factors['dominant_factor']}")
     
     goals_home = home_stats.get('goals', {}).get('for', {}).get('average', {}).get('total', 0) if home_stats else 0
+    goals_home = float(goals_home) if goals_home else 0.0
     goals_away = away_stats.get('goals', {}).get('for', {}).get('average', {}).get('total', 0) if away_stats else 0
+    goals_away = float(goals_away) if goals_away else 0.0
     
     analysis_data = {
         'power_score_home': power_home,

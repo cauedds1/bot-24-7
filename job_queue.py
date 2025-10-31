@@ -1,0 +1,106 @@
+import asyncio
+import logging
+from datetime import datetime
+from typing import Dict, List, Optional
+import json
+
+from api_client import buscar_jogos_do_dia
+from analysts.master_analyzer import generate_match_analysis
+from db_manager import DatabaseManager
+
+logger = logging.getLogger(__name__)
+
+analysis_queue = asyncio.Queue()
+
+job_status = {}
+
+class AnalysisJob:
+    def __init__(self, user_id: int, analysis_type: str, league_id: Optional[int] = None, fixture_id: Optional[int] = None):
+        self.user_id = user_id
+        self.analysis_type = analysis_type
+        self.league_id = league_id
+        self.fixture_id = fixture_id
+        self.job_id = f"{user_id}_{analysis_type}_{datetime.now().timestamp()}"
+        self.status = "queued"
+        self.total_fixtures = 0
+        self.processed = 0
+        self.created_at = datetime.now()
+
+async def add_analysis_job(user_id: int, analysis_type: str, league_id: Optional[int] = None, fixture_id: Optional[int] = None):
+    job = AnalysisJob(user_id, analysis_type, league_id, fixture_id)
+    job_status[job.job_id] = job
+    await analysis_queue.put(job)
+    logger.info(f"✅ Job {job.job_id} adicionado à fila. Tipo: {analysis_type}")
+    return job.job_id
+
+def get_job_status(job_id: str) -> Optional[Dict]:
+    job = job_status.get(job_id)
+    if job:
+        return {
+            "job_id": job.job_id,
+            "status": job.status,
+            "progress": f"{job.processed}/{job.total_fixtures}",
+            "type": job.analysis_type
+        }
+    return None
+
+async def background_analysis_worker(db_manager: DatabaseManager):
+    logger.info("🚀 Background analysis worker iniciado!")
+    
+    while True:
+        try:
+            job = await analysis_queue.get()
+            logger.info(f"📋 Processando job {job.job_id} - Tipo: {job.analysis_type}")
+            
+            job.status = "processing"
+            
+            fixtures_to_analyze = []
+            if job.fixture_id:
+                fixtures_to_analyze = [{"fixture": {"id": job.fixture_id}}]
+            elif job.league_id:
+                from api_client import buscar_jogos_por_liga
+                fixtures_to_analyze = buscar_jogos_por_liga(job.league_id) or []
+            else:
+                fixtures_to_analyze = buscar_jogos_do_dia() or []
+            
+            job.total_fixtures = len(fixtures_to_analyze)
+            logger.info(f"📊 {job.total_fixtures} jogos para analisar")
+            
+            for jogo in fixtures_to_analyze:
+                try:
+                    fixture_id = jogo.get('fixture', {}).get('id')
+                    if not fixture_id:
+                        continue
+                    
+                    logger.info(f"🔍 Analisando fixture {fixture_id}...")
+                    
+                    analysis_packet = generate_match_analysis(jogo)
+                    
+                    dossier_json = json.dumps(analysis_packet, ensure_ascii=False)
+                    
+                    db_manager.save_daily_analysis(
+                        fixture_id=fixture_id,
+                        analysis_type=job.analysis_type,
+                        dossier_json=dossier_json,
+                        user_id=job.user_id
+                    )
+                    
+                    job.processed += 1
+                    logger.info(f"✅ Fixture {fixture_id} analisado ({job.processed}/{job.total_fixtures})")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Erro ao analisar fixture: {e}")
+                    continue
+                
+                await asyncio.sleep(0.1)
+            
+            job.status = "completed"
+            logger.info(f"🎉 Job {job.job_id} concluído! {job.processed} jogos analisados")
+            
+            analysis_queue.task_done()
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no background worker: {e}")
+            if 'job' in locals():
+                job.status = "failed"
+            await asyncio.sleep(1)

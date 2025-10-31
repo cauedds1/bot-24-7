@@ -257,3 +257,126 @@ class DatabaseManager:
         except Exception as e:
             print(f"❌ Erro ao forçar reanálise: {e}")
             return False
+
+    def save_daily_analysis(self, fixture_id: int, analysis_type: str, dossier_json: str, user_id: int):
+        """
+        Salva análise processada em batch no sistema de fila.
+        
+        Args:
+            fixture_id: ID do jogo
+            analysis_type: Tipo de análise ('full', 'goals_only', 'corners_only', etc.)
+            dossier_json: JSON completo da análise (dossier)
+            user_id: ID do usuário que solicitou
+        """
+        if not self.enabled:
+            return False
+        
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            query = """
+                INSERT INTO daily_analyses 
+                (fixture_id, analysis_type, dossier_json, user_id, created_at)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (fixture_id, analysis_type, user_id)
+                DO UPDATE SET
+                    dossier_json = EXCLUDED.dossier_json,
+                    created_at = EXCLUDED.created_at
+            """
+            
+            cursor.execute(query, (
+                fixture_id,
+                analysis_type,
+                dossier_json,
+                user_id,
+                agora_brasilia()
+            ))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Erro ao salvar daily analysis: {e}")
+            return False
+    
+    def get_daily_analyses(self, user_id: int, analysis_type: str, offset: int = 0, limit: int = 5) -> List[Dict]:
+        """
+        Recupera análises paginadas do banco.
+        
+        Args:
+            user_id: ID do usuário
+            analysis_type: Tipo de análise
+            offset: Offset para paginação
+            limit: Limite de resultados
+            
+        Returns:
+            Lista de análises com seus dossiers
+        """
+        if not self.enabled:
+            return []
+        
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            
+            query = """
+                SELECT id, fixture_id, analysis_type, dossier_json, created_at
+                FROM daily_analyses
+                WHERE user_id = %s AND analysis_type = %s
+                AND created_at >= CURRENT_DATE
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            
+            cursor.execute(query, (user_id, analysis_type, limit, offset))
+            resultados = cursor.fetchall()
+            
+            cursor.close()
+            conn.close()
+            
+            return [dict(r) for r in resultados]
+            
+        except Exception as e:
+            print(f"❌ Erro ao buscar daily analyses: {e}")
+            return []
+    
+    def count_daily_analyses(self, user_id: int, analysis_type: str) -> int:
+        """
+        Conta total de análises disponíveis para paginação.
+        
+        Args:
+            user_id: ID do usuário
+            analysis_type: Tipo de análise
+            
+        Returns:
+            Total de análises
+        """
+        if not self.enabled:
+            return 0
+        
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            query = """
+                SELECT COUNT(*) as total
+                FROM daily_analyses
+                WHERE user_id = %s AND analysis_type = %s
+                AND created_at >= CURRENT_DATE
+            """
+            
+            cursor.execute(query, (user_id, analysis_type))
+            total = cursor.fetchone()[0]
+            
+            cursor.close()
+            conn.close()
+            
+            return total
+            
+        except Exception as e:
+            print(f"❌ Erro ao contar daily analyses: {e}")
+            return 0
