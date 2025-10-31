@@ -278,35 +278,17 @@ def formatar_historico_jogos(ultimos_jogos, time_id, time_nome, mercado, periodo
 
 def gerar_justificativa_real(sugestoes_principais, stats_casa, stats_fora, nome_casa, nome_fora, classificacao, time_casa_id, time_fora_id):
     """
-    Gera justificativa REAL e CONVINCENTE baseada em dados estatísticos dos últimos 4 jogos.
-    Mostra dados específicos para cada mercado (cantos, cartões, chutes, gols).
+    Gera justificativa REAL e CONVINCENTE baseada em dados estatísticos.
+    
+    🔥 PHOENIX V4.0: Função simplificada - justificativas agora são geradas pelo Evidence-Based Dossier Formatter.
     """
     if not sugestoes_principais:
         return ""
-
-    # Importar helper de justificativas
-    from analysts.justificativas_helper import gerar_justificativa_ultimos_jogos
     
-    # Pegar sugestão principal
+    # Retornar mensagem básica - as justificativas detalhadas com evidências
+    # são geradas pelo format_evidence_based_dossier
     palpite_principal = sugestoes_principais[0]
-    mercado = palpite_principal['mercado']
-    
-    # Mapear mercado para tipo usado na função
-    mapa_mercados = {
-        'Gols': 'gols',
-        'Cantos': 'cantos',
-        'Cartões': 'cartoes',
-        'Finalizações': 'chutes'
-    }
-    
-    mercado_tipo = mapa_mercados.get(mercado)
-    
-    if not mercado_tipo:
-        # Mercados sem justificativa detalhada
-        return "✅ CONCLUSÃO: Estatísticas MUITO FAVORÁVEIS. Os dados indicam alta probabilidade de acerto.\n"
-    
-    # Gerar justificativa com dados dos últimos 4 jogos
-    return gerar_justificativa_ultimos_jogos(time_casa_id, time_fora_id, mercado_tipo, palpite_principal) + "\n"
+    return "✅ ANÁLISE BASEADA EM DADOS REAIS dos últimos jogos.\n"
 
 
 def gerar_narrativa_palpite(sugestao, stats_casa, stats_fora, nome_casa, nome_fora):

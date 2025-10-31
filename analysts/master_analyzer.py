@@ -754,103 +754,121 @@ async def _analyze_strength_of_schedule(team_id, league_id):
 
 async def _calculate_weighted_metrics(team_id, league_id, sos_data, team_stats=None):
     """
-    TASK 2 FIXED: Calcula métricas ponderadas por força do adversário (SoS).
+    🔥 PHOENIX V4.0 - FASE 1: ELIMINAR FALLBACK
     
-    Com FALLBACK ROBUSTO: Se não conseguir calcular weighted metrics dos últimos jogos,
-    usa as médias simples das estatísticas gerais do time.
+    Calcula métricas ponderadas por força do adversário (SoS) usando DADOS REAIS.
+    
+    SEMPRE busca estatísticas detalhadas de cada jogo individual usando /fixtures/statistics.
+    SEM FALLBACK. SEM COMPROMISSOS. Apenas análise baseada em evidências reais.
     
     Args:
         team_id: ID do time
         league_id: ID da liga
         sos_data: Dados de Strength of Schedule
-        team_stats: Estatísticas gerais do time (para fallback)
+        team_stats: Estatísticas gerais do time (não usado mais)
     
     Returns:
         dict: {
             'weighted_corners_for': float,
             'weighted_corners_against': float,
             'weighted_shots_for': float,
-            'weighted_shots_against': float
+            'weighted_shots_against': float,
+            'weighted_cards_for': float,
+            'weighted_cards_against': float
         }
     """
-    from api_client import buscar_ultimos_jogos_time, buscar_estatisticas_gerais_time
+    from api_client import buscar_ultimos_jogos_time, buscar_estatisticas_jogo
     
+    print(f"    🔍 FASE 1: Buscando últimos jogos do time {team_id}...")
     ultimos_jogos = await buscar_ultimos_jogos_time(team_id, limite=5)
     
-    # Tentar calcular weighted metrics dos últimos jogos
-    if ultimos_jogos and len(ultimos_jogos) > 0:
-        total_corners_for = 0
-        total_corners_against = 0
-        total_shots_for = 0
-        total_shots_against = 0
-        total_weight = 0
+    if not ultimos_jogos or len(ultimos_jogos) == 0:
+        print(f"    ❌ ERRO CRÍTICO: Nenhum jogo encontrado para o time {team_id}")
+        print(f"    🛑 PHOENIX PROTOCOL: Análise IMPOSSÍVEL sem dados históricos")
+        return None  # Sinaliza falha - não há dados para análise
+    
+    print(f"    ✅ {len(ultimos_jogos)} jogos encontrados. Buscando estatísticas DETALHADAS de cada jogo...")
+    
+    total_corners_for = 0
+    total_corners_against = 0
+    total_shots_for = 0
+    total_shots_against = 0
+    total_cards_for = 0
+    total_cards_against = 0
+    total_weight = 0
+    jogos_processados = 0
+    
+    opponents_qsc = sos_data.get('opponents_qsc', [])
+    
+    for idx, jogo in enumerate(ultimos_jogos[:5]):
+        fixture_id = jogo.get('fixture_id')
         
-        opponents_qsc = sos_data.get('opponents_qsc', [])
+        if not fixture_id:
+            print(f"    ⚠️ Jogo {idx+1}: Sem fixture_id, pulando...")
+            continue
         
-        for idx, jogo in enumerate(ultimos_jogos[:5]):
-            stats = jogo.get('statistics', {})
-            
-            # Determinar se jogou em casa ou fora - acessar corretamente a estrutura aninhada
-            teams_data = jogo.get('teams', {})
-            home_team_id = teams_data.get('home', {}).get('id')
-            eh_casa = home_team_id == team_id
-            team_key = 'home' if eh_casa else 'away'
-            opponent_key = 'away' if eh_casa else 'home'
-            
-            # Extrair métricas
-            corners_for = int(stats.get(team_key, {}).get('Corner Kicks', 0) or 0)
-            corners_against = int(stats.get(opponent_key, {}).get('Corner Kicks', 0) or 0)
-            shots_for = int(stats.get(team_key, {}).get('Shots on Goal', 0) or 0)
-            shots_against = int(stats.get(opponent_key, {}).get('Shots on Goal', 0) or 0)
-            
-            # Calcular peso baseado no QSC do adversário
-            opponent_qsc = opponents_qsc[idx] if idx < len(opponents_qsc) else 50.0
-            weight = opponent_qsc / 50.0  # Normalizar (50 = peso 1.0)
-            
-            total_corners_for += corners_for * weight
-            total_corners_against += corners_against * weight
-            total_shots_for += shots_for * weight
-            total_shots_against += shots_against * weight
-            total_weight += weight
+        # 🔥 PHOENIX PROTOCOL: BUSCAR ESTATÍSTICAS DETALHADAS DE CADA JOGO
+        print(f"    🔎 Jogo {idx+1}/{len(ultimos_jogos[:5])}: Buscando stats do fixture {fixture_id}...")
+        stats = await buscar_estatisticas_jogo(fixture_id)
         
-        if total_weight > 0:
-            weighted = {
-                'weighted_corners_for': total_corners_for / total_weight,
-                'weighted_corners_against': total_corners_against / total_weight,
-                'weighted_shots_for': total_shots_for / total_weight,
-                'weighted_shots_against': total_shots_against / total_weight
-            }
-            
-            # Verificar se conseguiu calcular algo válido (não tudo 0.0)
-            if any(v > 0 for v in weighted.values()):
-                print(f"    ✅ Weighted Metrics calculados com sucesso dos últimos jogos")
-                return weighted
+        if not stats:
+            print(f"    ⚠️ Jogo {idx+1}: Estatísticas não disponíveis para fixture {fixture_id}, pulando...")
+            continue
+        
+        # Determinar se jogou em casa ou fora
+        teams_data = jogo.get('teams', {})
+        home_team_id = teams_data.get('home', {}).get('id')
+        eh_casa = home_team_id == team_id
+        team_key = 'home' if eh_casa else 'away'
+        opponent_key = 'away' if eh_casa else 'home'
+        
+        # Extrair métricas do jogo
+        corners_for = int(stats.get(team_key, {}).get('Corner Kicks', 0) or 0)
+        corners_against = int(stats.get(opponent_key, {}).get('Corner Kicks', 0) or 0)
+        shots_for = int(stats.get(team_key, {}).get('Shots on Goal', 0) or 0)
+        shots_against = int(stats.get(opponent_key, {}).get('Shots on Goal', 0) or 0)
+        yellow_cards_for = int(stats.get(team_key, {}).get('Yellow Cards', 0) or 0)
+        red_cards_for = int(stats.get(team_key, {}).get('Red Cards', 0) or 0)
+        yellow_cards_against = int(stats.get(opponent_key, {}).get('Yellow Cards', 0) or 0)
+        red_cards_against = int(stats.get(opponent_key, {}).get('Red Cards', 0) or 0)
+        
+        # Calcular peso baseado no QSC do adversário
+        opponent_qsc = opponents_qsc[idx] if idx < len(opponents_qsc) else 50.0
+        weight = opponent_qsc / 50.0  # Normalizar (50 = peso 1.0)
+        
+        # Acumular valores ponderados
+        total_corners_for += corners_for * weight
+        total_corners_against += corners_against * weight
+        total_shots_for += shots_for * weight
+        total_shots_against += shots_against * weight
+        total_cards_for += (yellow_cards_for + red_cards_for * 3) * weight  # Vermelho = 3 amarelos
+        total_cards_against += (yellow_cards_against + red_cards_against * 3) * weight
+        total_weight += weight
+        jogos_processados += 1
+        
+        print(f"    ✅ Jogo {idx+1}: {corners_for} cantos | {shots_for} finalizações | {yellow_cards_for+red_cards_for} cartões (peso: {weight:.2f})")
     
-    # 🛡️ FALLBACK ROBUSTO: Usar estimativas baseadas em stats gerais
-    print(f"    ⚠️ Weighted Metrics: Sem dados dos últimos jogos, usando FALLBACK com stats gerais")
+    if jogos_processados == 0 or total_weight == 0:
+        print(f"    ❌ ERRO CRÍTICO: Nenhum jogo processado com sucesso")
+        print(f"    🛑 PHOENIX PROTOCOL: Análise IMPOSSÍVEL - estatísticas não disponíveis")
+        return None  # Sinaliza falha - não conseguiu obter dados reais
     
-    if not team_stats:
-        print(f"    ❌ Sem team_stats para fallback - retornando valores mínimos")
-        return {
-            'weighted_corners_for': 5.0,  # Valor padrão razoável
-            'weighted_corners_against': 5.0,
-            'weighted_shots_for': 10.0,
-            'weighted_shots_against': 10.0
-        }
-    
-    # Calcular fallback baseado em perfil tático
-    profile = _calculate_tactical_profile(team_stats)
-    
-    fallback = {
-        'weighted_corners_for': profile.get('corners_for_avg', 5.0),
-        'weighted_corners_against': profile.get('corners_against_avg', 5.0),
-        'weighted_shots_for': profile.get('shots_for_avg', 10.0),
-        'weighted_shots_against': profile.get('shots_against_avg', 10.0)
+    # Calcular médias ponderadas
+    weighted_metrics = {
+        'weighted_corners_for': total_corners_for / total_weight,
+        'weighted_corners_against': total_corners_against / total_weight,
+        'weighted_shots_for': total_shots_for / total_weight,
+        'weighted_shots_against': total_shots_against / total_weight,
+        'weighted_cards_for': total_cards_for / total_weight,
+        'weighted_cards_against': total_cards_against / total_weight
     }
     
-    print(f"    📊 FALLBACK aplicado: {fallback['weighted_corners_for']:.1f} cantos, {fallback['weighted_shots_for']:.1f} finalizações")
+    print(f"    🎯 WEIGHTED METRICS CALCULADOS ({jogos_processados} jogos):")
+    print(f"       🚩 Cantos: {weighted_metrics['weighted_corners_for']:.1f} feitos | {weighted_metrics['weighted_corners_against']:.1f} sofridos")
+    print(f"       ⚽ Finalizações no gol: {weighted_metrics['weighted_shots_for']:.1f} feitas | {weighted_metrics['weighted_shots_against']:.1f} sofridas")
+    print(f"       🟨 Cartões: {weighted_metrics['weighted_cards_for']:.1f} recebidos | {weighted_metrics['weighted_cards_against']:.1f} provocados")
     
-    return fallback
+    return weighted_metrics
 
 
 def _extract_evidence_from_recent_games(ultimos_jogos, team_id, team_name):
@@ -1121,6 +1139,21 @@ async def generate_match_analysis(jogo):
     print("⚖️ TASK 2: Calculando Weighted Metrics (Métricas Ponderadas)...")
     weighted_home = await _calculate_weighted_metrics(home_team_id, league_id, sos_home, home_stats)
     weighted_away = await _calculate_weighted_metrics(away_team_id, league_id, sos_away, away_stats)
+    
+    # 🔥 PHOENIX V4.0: VERIFICAR SE WEIGHTED METRICS FORAM CALCULADOS COM SUCESSO
+    if weighted_home is None or weighted_away is None:
+        print(f"  ❌ WEIGHTED METRICS INDISPONÍVEIS")
+        print(f"  🛑 PHOENIX PROTOCOL: Impossível gerar análise sem dados históricos reais")
+        print(f"  📋 Casa: {'✗ FALHOU' if weighted_home is None else '✓ OK'} | Fora: {'✗ FALHOU' if weighted_away is None else '✓ OK'}")
+        return {
+            'error': 'DADOS_INSUFICIENTES',
+            'message': f'Não há dados históricos suficientes para {home_team_name} e/ou {away_team_name}. Análise impossível sem estatísticas reais.',
+            'missing_data': {
+                'home': weighted_home is None,
+                'away': weighted_away is None
+            }
+        }
+    
     print(f"  📊 Casa: {weighted_home['weighted_corners_for']:.1f} cantos | {weighted_home['weighted_shots_for']:.1f} finalizações (ponderado)")
     print(f"  📊 Fora: {weighted_away['weighted_corners_for']:.1f} cantos | {weighted_away['weighted_shots_for']:.1f} finalizações (ponderado)")
     
