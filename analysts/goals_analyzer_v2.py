@@ -9,9 +9,8 @@ NOVO MODELO DE CONFIANÇA BASEADO EM PROBABILIDADES ESTATÍSTICAS:
 PHOENIX V2.0: Sistema de VETO + Confiança Calibrada
 """
 
-from config import (ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_GOLS_OVER_UNDER,
+from config import (MIN_CONFIANCA_GOLS_OVER_UNDER,
                     MIN_CONFIANCA_GOLS_OVER_1_5, MIN_CONFIANCA_GOLS_OVER_3_5)
-# DEPRECATED: from analysts.context_analyzer import verificar_veto_mercado
 from analysts.confidence_calculator import calculate_final_confidence
 
 
@@ -38,18 +37,15 @@ def extract_goals_suggestions(analysis_packet, odds):
     
     palpites = []
     
-    # LAYER 3: Verificar VETO antes de adicionar cada palpite
-    # LAYER 4: Ajustar confiança baseado em coerência com script
+    # PURE ANALYST: Only statistical probability and script context (no odds filtering)
     
-    if 'gols_ft_over_2.5' in odds and odds['gols_ft_over_2.5'] >= ODD_MINIMA_DE_VALOR:
+    if 'gols_ft_over_2.5' in odds:
         tipo = "Over 2.5"
-        # NOVO MODELO: Calcular confiança baseada em probabilidade estatística
+        # PURE ANALYST: Calculate confidence based purely on statistical probability
         confianca, breakdown = calculate_final_confidence(
             statistical_probability_pct=over_2_5_prob,
             bet_type=tipo,
-            tactical_script=script,
-            value_score_pct=0.0,
-            odd=odds['gols_ft_over_2.5']
+            tactical_script=script
         )
         print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_2_5_prob:.0f}% -> Conf:{confianca:.1f}/10 (Base:{breakdown['confianca_base']:.1f}, Mods:{breakdown['modificador_script']:+.1f})")
         if confianca >= 5.0:
@@ -63,14 +59,12 @@ def extract_goals_suggestions(analysis_packet, odds):
                 "confidence_breakdown": breakdown
             })
     
-    if 'gols_ft_under_2.5' in odds and odds['gols_ft_under_2.5'] >= ODD_MINIMA_DE_VALOR:
+    if 'gols_ft_under_2.5' in odds:
         tipo = "Under 2.5"
         confianca, breakdown = calculate_final_confidence(
             statistical_probability_pct=under_2_5_prob,
             bet_type=tipo,
-            tactical_script=script,
-            value_score_pct=0.0,
-            odd=odds['gols_ft_under_2.5']
+            tactical_script=script
         )
         print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{under_2_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
         if confianca >= 5.0:
@@ -84,15 +78,13 @@ def extract_goals_suggestions(analysis_packet, odds):
                 "confidence_breakdown": breakdown
             })
     
-    if 'gols_ft_over_1.5' in odds and odds['gols_ft_over_1.5'] >= ODD_MINIMA_DE_VALOR:
+    if 'gols_ft_over_1.5' in odds:
         tipo = "Over 1.5"
         over_1_5_prob = min(over_2_5_prob + 15, 90)
         confianca, breakdown = calculate_final_confidence(
             statistical_probability_pct=over_1_5_prob,
             bet_type=tipo,
-            tactical_script=script,
-            value_score_pct=0.0,
-            odd=odds['gols_ft_over_1.5']
+            tactical_script=script
         )
         print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_1_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
         if confianca >= 5.5:
@@ -106,16 +98,14 @@ def extract_goals_suggestions(analysis_packet, odds):
                 "confidence_breakdown": breakdown
             })
     
-    if 'gols_ft_over_3.5' in odds and odds['gols_ft_over_3.5'] >= ODD_MINIMA_DE_VALOR:
+    if 'gols_ft_over_3.5' in odds:
         tipo = "Over 3.5"
         if script == 'SCRIPT_OPEN_HIGH_SCORING_GAME':
             over_3_5_prob = max(over_2_5_prob - 20, 30)
             confianca, breakdown = calculate_final_confidence(
                 statistical_probability_pct=over_3_5_prob,
                 bet_type=tipo,
-                tactical_script=script,
-                value_score_pct=0.0,
-                odd=odds['gols_ft_over_3.5']
+                tactical_script=script
             )
             print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_3_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
             if confianca >= 5.0:

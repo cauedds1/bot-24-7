@@ -79,14 +79,12 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
             line=linha
         )
         
-        # ✅ REFATORADO: Calcular confiança final
+        # ✅ PURE ANALYST: Calculate confidence based purely on statistical probability
         bet_type = f"Over {linha} Finalizações"
         conf_final, breakdown = calculate_final_confidence(
             statistical_probability_pct=prob_pct,
             bet_type=bet_type,
-            tactical_script=script_name,
-            value_score_pct=0.0,
-            odd=odds.get(f"shots_over_{linha}", 2.0) if odds else 2.0  # Default odd se não disponível
+            tactical_script=script_name
         )
         
         print(f"     {bet_type}: Prob={prob_pct:.1f}% → Conf={conf_final:.1f}")
@@ -115,9 +113,7 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         conf_final, breakdown = calculate_final_confidence(
             statistical_probability_pct=prob_under,
             bet_type=bet_type,
-            tactical_script=script_name,
-            value_score_pct=0.0,
-            odd=odds.get(f"shots_under_{linha}", 2.0) if odds else 2.0
+            tactical_script=script_name
         )
         
         if conf_final >= 5.5:
@@ -143,9 +139,7 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
             conf_final, breakdown = calculate_final_confidence(
                 statistical_probability_pct=prob_pct,
                 bet_type=bet_type,
-                tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=2.0
+                tactical_script=script_name
             )
             
             if conf_final >= 5.5:
@@ -170,9 +164,7 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
             conf_final, breakdown = calculate_final_confidence(
                 statistical_probability_pct=prob_under,
                 bet_type=bet_type,
-                tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=2.0
+                tactical_script=script_name
             )
             
             if conf_final >= 5.5:
@@ -199,9 +191,7 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
             conf_final, breakdown = calculate_final_confidence(
                 statistical_probability_pct=prob_pct,
                 bet_type=bet_type,
-                tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=2.0
+                tactical_script=script_name
             )
             
             if conf_final >= 5.5:
@@ -226,9 +216,7 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
             conf_final, breakdown = calculate_final_confidence(
                 statistical_probability_pct=prob_under,
                 bet_type=bet_type,
-                tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=2.0
+                tactical_script=script_name
             )
             
             if conf_final >= 5.5:
@@ -254,9 +242,7 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
             conf_final, breakdown = calculate_final_confidence(
                 statistical_probability_pct=prob_pct,
                 bet_type=bet_type,
-                tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=2.0
+                tactical_script=script_name
             )
             
             if conf_final >= 5.5:
@@ -281,9 +267,7 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
             conf_final, breakdown = calculate_final_confidence(
                 statistical_probability_pct=prob_under,
                 bet_type=bet_type,
-                tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=2.0
+                tactical_script=script_name
             )
             
             if conf_final >= 5.5:

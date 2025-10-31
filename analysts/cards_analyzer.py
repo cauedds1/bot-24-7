@@ -11,7 +11,7 @@ ARQUITETURA:
 3. Usar breakdown para evidências e transparência
 """
 
-from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CARTOES
+from config import MIN_CONFIANCA_CARTOES
 from analysts.confidence_calculator import (
     calculate_statistical_probability_cards_over,
     calculate_final_confidence
@@ -99,14 +99,12 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 statistical_probability_pct=prob_pct,
                 bet_type=bet_type,
                 tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=odd_value
             )
             
             print(f"     {bet_type}: Prob={prob_pct:.1f}% → Conf={conf_final:.1f} (odd={odd_value:.2f})")
             
             # ✅ Filtros de qualidade
-            if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CARTOES:
+            if conf_final >= MIN_CONFIANCA_CARTOES:
                 palpites.append({
                     "tipo": f"Over {linha}",
                     "confianca": conf_final,
@@ -136,13 +134,11 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 statistical_probability_pct=prob_under,
                 bet_type=bet_type,
                 tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=odd_value
             )
             
             print(f"     {bet_type}: Prob={prob_under:.1f}% → Conf={conf_final:.1f} (odd={odd_value:.2f})")
             
-            if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CARTOES:
+            if conf_final >= MIN_CONFIANCA_CARTOES:
                 palpites.append({
                     "tipo": f"Under {linha}",
                     "confianca": conf_final,
@@ -170,11 +166,9 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 statistical_probability_pct=prob_pct,
                 bet_type=bet_type,
                 tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=odd_value
             )
             
-            if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CARTOES:
+            if conf_final >= MIN_CONFIANCA_CARTOES:
                 palpites.append({
                     "tipo": f"Over {linha} Casa",
                     "confianca": conf_final,
@@ -200,11 +194,9 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 statistical_probability_pct=prob_under,
                 bet_type=bet_type,
                 tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=odd_value
             )
             
-            if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CARTOES:
+            if conf_final >= MIN_CONFIANCA_CARTOES:
                 palpites.append({
                     "tipo": f"Under {linha} Casa",
                     "confianca": conf_final,
@@ -232,11 +224,9 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 statistical_probability_pct=prob_pct,
                 bet_type=bet_type,
                 tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=odd_value
             )
             
-            if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CARTOES:
+            if conf_final >= MIN_CONFIANCA_CARTOES:
                 palpites.append({
                     "tipo": f"Over {linha} Fora",
                     "confianca": conf_final,
@@ -262,11 +252,9 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 statistical_probability_pct=prob_under,
                 bet_type=bet_type,
                 tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=odd_value
             )
             
-            if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CARTOES:
+            if conf_final >= MIN_CONFIANCA_CARTOES:
                 palpites.append({
                     "tipo": f"Under {linha} Fora",
                     "confianca": conf_final,

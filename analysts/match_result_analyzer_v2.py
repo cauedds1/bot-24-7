@@ -6,7 +6,7 @@ Extrai probabilidades de 1X2 calculadas pelo Master Analyzer e formata sugestõe
 PHOENIX V2.0: Agora com sistema de VETO e ajuste de confiança por script.
 """
 
-from config import ODD_MINIMA_DE_VALOR
+# PURE ANALYST: No odd filtering - only confidence-based selection
 # DEPRECATED: from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
 
 
@@ -37,7 +37,7 @@ def extract_match_result_suggestions(analysis_packet, odds):
     # LAYER 3: Verificar VETO antes de adicionar cada palpite
     # LAYER 4: Ajustar confiança baseado em coerência com script
     
-    if 'home_win' in odds and odds['home_win'] >= ODD_MINIMA_DE_VALOR:
+    if 'home_win' in odds:
         tipo = "Vitória Casa"
         confianca = _convert_probability_to_confidence(home_win_prob)
         if confianca >= 5.5:
@@ -48,7 +48,7 @@ def extract_match_result_suggestions(analysis_packet, odds):
                 "probabilidade": home_win_prob
             })
     
-    if 'draw' in odds and odds['draw'] >= ODD_MINIMA_DE_VALOR:
+    if 'draw' in odds:
         tipo = "Draw"
         confianca = _convert_probability_to_confidence(draw_prob)
         if confianca >= 5.5:
@@ -59,7 +59,7 @@ def extract_match_result_suggestions(analysis_packet, odds):
                 "probabilidade": draw_prob
             })
     
-    if 'away_win' in odds and odds['away_win'] >= ODD_MINIMA_DE_VALOR:
+    if 'away_win' in odds:
         tipo = "Vitória Fora"
         confianca = _convert_probability_to_confidence(away_win_prob)
         if confianca >= 5.5:
@@ -70,7 +70,7 @@ def extract_match_result_suggestions(analysis_packet, odds):
                 "probabilidade": away_win_prob
             })
     
-    if 'double_chance_1x' in odds and odds['double_chance_1x'] >= ODD_MINIMA_DE_VALOR:
+    if 'double_chance_1x' in odds:
         double_1x_prob = home_win_prob + draw_prob
         confianca = _convert_probability_to_confidence(double_1x_prob)
         if confianca >= 6.0:
@@ -81,7 +81,7 @@ def extract_match_result_suggestions(analysis_packet, odds):
                 "probabilidade": double_1x_prob
             })
     
-    if 'double_chance_x2' in odds and odds['double_chance_x2'] >= ODD_MINIMA_DE_VALOR:
+    if 'double_chance_x2' in odds:
         double_x2_prob = draw_prob + away_win_prob
         confianca = _convert_probability_to_confidence(double_x2_prob)
         if confianca >= 6.0:
@@ -92,7 +92,7 @@ def extract_match_result_suggestions(analysis_packet, odds):
                 "probabilidade": double_x2_prob
             })
     
-    if 'double_chance_12' in odds and odds['double_chance_12'] >= ODD_MINIMA_DE_VALOR:
+    if 'double_chance_12' in odds:
         double_12_prob = home_win_prob + away_win_prob
         confianca = _convert_probability_to_confidence(double_12_prob)
         if confianca >= 6.0:

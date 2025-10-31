@@ -11,7 +11,7 @@ ARQUITETURA:
 3. Usar breakdown para evidências e transparência
 """
 
-from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CANTOS, MIN_CONFIANCA_CANTOS_UNDER
+from config import MIN_CONFIANCA_CANTOS, MIN_CONFIANCA_CANTOS_UNDER
 from analysts.context_analyzer import analisar_compatibilidade_ofensiva_defensiva
 from analysts.confidence_calculator import (
     calculate_statistical_probability_corners_over,
@@ -137,13 +137,12 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     bet_type=bet_type,
                     tactical_script=script_name,
                     value_score_pct=0.0,  # Value score calculado externamente se necessário
-                    odd=odd_value
                 )
                 
                 print(f"     {bet_type}: Prob={prob_pct:.1f}% → Conf={conf_final:.1f} (odd={odd_value:.2f})")
                 
                 # ✅ Filtros de qualidade
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                if conf_final >= MIN_CONFIANCA_CANTOS:
                     palpites.append({
                         "tipo": bet_type,
                         "confianca": conf_final,
@@ -181,13 +180,11 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     statistical_probability_pct=prob_under,
                     bet_type=bet_type,
                     tactical_script=script_name,
-                    value_score_pct=0.0,
-                    odd=odd_value
                 )
                 
                 print(f"     {bet_type}: Prob={prob_under:.1f}% → Conf={conf_final:.1f} (odd={odd_value:.2f})")
                 
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                if conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
                     palpites.append({
                         "tipo": bet_type,
                         "confianca": conf_final,
@@ -218,11 +215,9 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     statistical_probability_pct=prob_pct,
                     bet_type=bet_type,
                     tactical_script=script_name,
-                    value_score_pct=0.0,
-                    odd=odd_value
                 )
                 
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                if conf_final >= MIN_CONFIANCA_CANTOS:
                     palpites.append({
                         "tipo": f"Over {linha} HT",
                         "confianca": conf_final,
@@ -254,11 +249,9 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     statistical_probability_pct=prob_under,
                     bet_type=bet_type,
                     tactical_script=script_name,
-                    value_score_pct=0.0,
-                    odd=odd_value
                 )
                 
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                if conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
                     palpites.append({
                         "tipo": f"Under {linha} HT",
                         "confianca": conf_final,
@@ -289,11 +282,9 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     statistical_probability_pct=prob_pct,
                     bet_type=bet_type,
                     tactical_script=script_name,
-                    value_score_pct=0.0,
-                    odd=odd_value
                 )
                 
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                if conf_final >= MIN_CONFIANCA_CANTOS:
                     palpites.append({
                         "tipo": f"Over {linha} Casa",
                         "confianca": conf_final,
@@ -323,11 +314,9 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     statistical_probability_pct=prob_under,
                     bet_type=bet_type,
                     tactical_script=script_name,
-                    value_score_pct=0.0,
-                    odd=odd_value
                 )
                 
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                if conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
                     palpites.append({
                         "tipo": f"Under {linha} Casa",
                         "confianca": conf_final,
@@ -358,11 +347,9 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     statistical_probability_pct=prob_pct,
                     bet_type=bet_type,
                     tactical_script=script_name,
-                    value_score_pct=0.0,
-                    odd=odd_value
                 )
                 
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                if conf_final >= MIN_CONFIANCA_CANTOS:
                     palpites.append({
                         "tipo": f"Over {linha} Fora",
                         "confianca": conf_final,
@@ -392,11 +379,9 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                     statistical_probability_pct=prob_under,
                     bet_type=bet_type,
                     tactical_script=script_name,
-                    value_score_pct=0.0,
-                    odd=odd_value
                 )
                 
-                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                if conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
                     palpites.append({
                         "tipo": f"Under {linha} Fora",
                         "confianca": conf_final,

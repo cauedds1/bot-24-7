@@ -1,5 +1,5 @@
 # analysts/btts_analyzer.py
-from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_BTTS_SIM, MIN_CONFIANCA_BTTS_NAO
+from config import MIN_CONFIANCA_BTTS_SIM, MIN_CONFIANCA_BTTS_NAO
 from analysts.confidence_calculator import calculate_statistical_probability_btts, calculate_final_confidence
 
 def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
@@ -22,17 +22,14 @@ def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
 
     palpites_btts = []
 
-    if 'btts_yes' in odds and odds['btts_yes'] >= ODD_MINIMA_DE_VALOR:
+    if 'btts_yes' in odds:
         odd_btts_yes = odds['btts_yes']
         
-        value_score = ((1 / odd_btts_yes) - (prob_btts_pct / 100)) / (prob_btts_pct / 100) * 100 if prob_btts_pct > 0 else 0
-        
+        # PURE ANALYST: Calculate confidence based purely on statistical probability
         confianca, breakdown = calculate_final_confidence(
             statistical_probability_pct=prob_btts_pct,
             bet_type="BTTS Sim",
-            tactical_script=script_name,
-            value_score_pct=value_score,
-            odd=odd_btts_yes
+            tactical_script=script_name
         )
         
         if confianca >= MIN_CONFIANCA_BTTS_SIM:
@@ -43,17 +40,14 @@ def analisar_mercado_btts(stats_casa, stats_fora, odds, script_name=None):
                 "breakdown": breakdown
             })
 
-    if 'btts_no' in odds and odds['btts_no'] >= ODD_MINIMA_DE_VALOR:
+    if 'btts_no' in odds:
         odd_btts_no = odds['btts_no']
         
-        value_score = ((1 / odd_btts_no) - (prob_no_btts_pct / 100)) / (prob_no_btts_pct / 100) * 100 if prob_no_btts_pct > 0 else 0
-        
+        # PURE ANALYST: Calculate confidence based purely on statistical probability
         confianca, breakdown = calculate_final_confidence(
             statistical_probability_pct=prob_no_btts_pct,
             bet_type="BTTS Não",
-            tactical_script=script_name,
-            value_score_pct=value_score,
-            odd=odd_btts_no
+            tactical_script=script_name
         )
         
         if confianca >= MIN_CONFIANCA_BTTS_NAO:

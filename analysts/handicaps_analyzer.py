@@ -15,7 +15,6 @@ NOTA: Handicaps são complexos e requerem análise contextual profunda.
 Esta versão simplificada mantém a essência do sistema unificado.
 """
 
-from config import ODD_MINIMA_DE_VALOR
 from analysts.confidence_calculator import calculate_final_confidence
 
 
@@ -215,7 +214,7 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
         if odd_key in odds:
             odd_value = odds[odd_key]
             
-            if odd_value < ODD_MINIMA_DE_VALOR:
+            if False:  # PURE ANALYST: No odd filtering
                 continue
             
             # ✅ REFATORADO: Converter superioridade em probabilidade
@@ -225,13 +224,11 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             else:
                 prob_pct = superioridade_to_probability(superioridade_casa, handicap_line)
             
-            # ✅ REFATORADO: Calcular confiança final via confidence_calculator
+            # ✅ PURE ANALYST: Calculate confidence based purely on statistical probability
             conf_final, breakdown = calculate_final_confidence(
                 statistical_probability_pct=prob_pct,
                 bet_type=bet_type,
-                tactical_script=script_name,
-                value_score_pct=0.0,
-                odd=odd_value
+                tactical_script=script_name
             )
             
             print(f"     {bet_type}: Prob={prob_pct:.1f}% → Conf={conf_final:.1f} (odd={odd_value:.2f})")
