@@ -424,30 +424,33 @@ async def gerar_analise_completa_todos_mercados(jogo):
             if time_info['team']['name'] == jogo['teams']['away']['name']:
                 pos_fora = time_info['rank']
     
+    # Adicionar posições e classificação ao analysis_packet
+    analysis_packet['home_position'] = pos_casa
+    analysis_packet['away_position'] = pos_fora
+    analysis_packet['league_standings'] = classificacao
+    
     # 3️⃣ ANALYZERS ESPECIALIZADOS CONSOMEM O MASTER PACKET
     print("--- 📊 SPECIALIST ANALYZERS EXTRACTING DATA ---")
     
-    # Extrair script ANTES de chamar analyzers (para passar como parâmetro)
+    # Extrair script e stats para analyzers legados
     script = analysis_packet['analysis_summary']['selected_script']
+    stats_casa = analysis_packet['raw_data']['home_stats']
+    stats_fora = analysis_packet['raw_data']['away_stats']
     
-    # Analyzers refatorados (Phoenix V2.0) - recebem analysis_packet diretamente
+    # Analyzers refatorados (Phoenix V3.0) - recebem analysis_packet diretamente
     analise_gols = analisar_mercado_gols(analysis_packet, odds)
     print("--- ✅ GOALS ANALYZER DONE ---")
     
     analise_resultado = analisar_mercado_resultado_final(analysis_packet, odds)
     print("--- ✅ MATCH RESULT ANALYZER DONE ---")
     
-    # Analyzers legacy - recebem stats + script_name para VETO
-    stats_casa = analysis_packet['raw_data']['home_stats']
-    stats_fora = analysis_packet['raw_data']['away_stats']
-    
-    analise_cantos = analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, analysis_packet, script)
+    analise_cantos = analisar_mercado_cantos(analysis_packet, odds)
     print("--- ✅ CORNERS ANALYZER DONE ---")
     
     analise_btts = analisar_mercado_btts(stats_casa, stats_fora, odds, script)
     print("--- ✅ BTTS ANALYZER DONE ---")
     
-    analise_cartoes = analisar_mercado_cartoes(stats_casa, stats_fora, odds, analysis_packet, script)
+    analise_cartoes = analisar_mercado_cartoes(analysis_packet, odds)
     print("--- ✅ CARDS ANALYZER DONE ---")
     
     analise_finalizacoes = analisar_mercado_finalizacoes(stats_casa, stats_fora, odds, analysis_packet, script)
@@ -517,85 +520,19 @@ async def gerar_analise_completa_todos_mercados(jogo):
     if todos_palpites_por_confianca:
         print(f"  🏆 Maior Confiança: {todos_palpites_por_confianca[0]['confianca']}/10 ({todos_palpites_por_confianca[0]['mercado_nome']})")
     
-    # Separar Análise Principal (maior confiança) e Outras Tendências
-    analise_principal = todos_palpites_por_confianca[:1]
-    outras_tendencias = todos_palpites_por_confianca[1:6]
+    # ========== PHOENIX V3.0: EVIDENCE-BASED DOSSIER FORMATTER ==========
+    # Extract just the palpites from the wrapped structure for the formatter
+    todos_palpites_limpos = [item['palpite'] for item in todos_palpites_por_confianca]
     
-    # ========== CONSTRUIR MENSAGEM ==========
-    mensagem = f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    mensagem += f"🏆 <b>{nome_liga}</b>\n"
-    mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    mensagem += f"⚽ <b>{time_casa_nome}</b> <i>({pos_casa}º)</i> <b>vs</b> <b>{time_fora_nome}</b> <i>({pos_fora}º)</i>\n"
-    mensagem += f"🕐 <b>Horário:</b> {horario_formatado} (Brasília)\n\n"
+    # Call the Evidence-Based Dossier Formatter
+    from analysts.dossier_formatter import format_evidence_based_dossier
+    mensagem = format_evidence_based_dossier(
+        jogo=jogo,
+        todos_palpites=todos_palpites_limpos,
+        master_analysis=analysis_packet
+    )
     
-    # 🚨 ALERTA DE CONTEXTO
-    if alerta_contexto:
-        mensagem += f"{alerta_contexto}\n\n"
-    
-    # ========== ROTEIRO TÁTICO ==========
-    mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    mensagem += f"🎬 <b>ROTEIRO TÁTICO</b>\n"
-    mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    mensagem += f"📜 <b>Script:</b> {script.replace('SCRIPT_', '').replace('_', ' ')}\n"
-    mensagem += f"💡 {reasoning}\n\n"
-    
-    # Só mostrar Power Score se não for valor padrão (50 vs 50 = sem dados)
-    if not (power_home == 50 and power_away == 50):
-        mensagem += f"📊 Power: Casa {power_home} | Fora {power_away}\n\n"
-    
-    # ========== 💎 ANÁLISE PRINCIPAL (MAIOR CONFIANÇA) ==========
-    if analise_principal:
-        mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        mensagem += f"💎 <b>ANÁLISE PRINCIPAL (Maior Confiança)</b>\n"
-        mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        
-        item = analise_principal[0]
-        p = item['palpite']
-        
-        mensagem += f"{item['mercado_emoji']} <b>{item['mercado_nome']}</b>\n"
-        mensagem += f"  📌 <b>Tendência:</b> Jogo para {p['tipo']} ({p.get('periodo', 'FT')})\n"
-        mensagem += f"  🎯 <b>Probabilidade:</b> {item['probabilidade']:.0f}%\n"
-        mensagem += f"  ⭐ <b>Confiança:</b> {item['confianca']}/10\n"
-        
-        # Justificativa se disponível
-        if p.get('justificativa'):
-            mensagem += f"  💬 <i>{p['justificativa']}</i>\n"
-        
-        mensagem += "\n"
-    
-    # ========== 🧠 OUTRAS TENDÊNCIAS DE ALTA CONFIANÇA ==========
-    if outras_tendencias:
-        mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        mensagem += f"🧠 <b>OUTRAS TENDÊNCIAS DE ALTA CONFIANÇA</b>\n"
-        mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        
-        for item in outras_tendencias:
-            p = item['palpite']
-            mensagem += f"{item['mercado_emoji']} <b>{item['mercado_nome']}:</b> {p['tipo']} ({p.get('periodo', 'FT')})\n"
-            mensagem += f"   Conf: {item['confianca']}/10 | Prob: {item['probabilidade']:.0f}%\n"
-        
-        mensagem += "\n"
-    
-    mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    
-    # ========== AVISO: MERCADOS SEM ODDS ==========
-    # Informar quais mercados não tinham odds disponíveis na API
-    mercados_sem_odds = []
-    if not analise_cantos or not analise_cantos.get('palpites'):
-        mercados_sem_odds.append("Escanteios")
-    if not analise_cartoes or not analise_cartoes.get('palpites'):
-        mercados_sem_odds.append("Cartões")
-    if not analise_finalizacoes or not analise_finalizacoes.get('palpites'):
-        mercados_sem_odds.append("Finalizações")
-    if not analise_handicaps or not analise_handicaps.get('palpites'):
-        mercados_sem_odds.append("Handicaps")
-    
-    if mercados_sem_odds:
-        mensagem += f"\n⚠️ <b>Mercados sem odds disponíveis na API:</b>\n"
-        mensagem += f"   {', '.join(mercados_sem_odds)}\n"
-        mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    
-    print("--- SURVIVAL CHECK 12: MESSAGE FORMATTING DONE ---")
+    print("--- SURVIVAL CHECK 12: EVIDENCE-BASED DOSSIER FORMATTED ---")
     print(f"--- SURVIVAL CHECK 13: RETURNING MESSAGE (Length: {len(mensagem)} chars) ---")
     
     return mensagem
@@ -765,14 +702,24 @@ async def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=No
         # 📜 PHOENIX V3.0: game_script agora vem do master_analyzer
         # Buscar análise master para contexto tático
         analysis_packet = await generate_match_analysis(jogo)
-        script = analysis_packet.get('tactical_script_name', 'EQUILIBRADO') if analysis_packet else 'EQUILIBRADO'
+        
+        # Adicionar posições e classificação ao analysis_packet
+        if analysis_packet and 'error' not in analysis_packet:
+            analysis_packet['home_position'] = pos_casa
+            analysis_packet['away_position'] = pos_fora
+            analysis_packet['league_standings'] = classificacao
+            script = analysis_packet.get('analysis_summary', {}).get('selected_script', 'EQUILIBRADO')
+            stats_casa = analysis_packet.get('raw_data', {}).get('home_stats', {})
+            stats_fora = analysis_packet.get('raw_data', {}).get('away_stats', {})
+        else:
+            script = 'EQUILIBRADO'
         
         analises_brutas = [
-            analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script),
-            analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, analysis_packet, script),
+            analisar_mercado_gols(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None,
+            analisar_mercado_cantos(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None,
             analisar_mercado_btts(stats_casa, stats_fora, odds, script),
-            analisar_mercado_resultado_final(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora),
-            analisar_mercado_cartoes(stats_casa, stats_fora, odds, analysis_packet, script),
+            analisar_mercado_resultado_final(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None,
+            analisar_mercado_cartoes(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None,
             analisar_mercado_finalizacoes(stats_casa, stats_fora, odds, analysis_packet, script),
             analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script)
         ]
@@ -1059,14 +1006,24 @@ async def coletar_todos_palpites_disponiveis():
 
         # 📜 PHOENIX V3.0: Buscar análise master para contexto tático
         analysis_packet = await generate_match_analysis(jogo)
-        script = analysis_packet.get('tactical_script_name', 'EQUILIBRADO') if analysis_packet else 'EQUILIBRADO'
         
-        # Analisar todos os mercados COM OS PARÂMETROS CORRETOS
-        analise_gols = analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script)
-        analise_cantos = analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, analysis_packet, script)
+        # Adicionar posições e classificação ao analysis_packet
+        if analysis_packet and 'error' not in analysis_packet:
+            analysis_packet['home_position'] = pos_casa
+            analysis_packet['away_position'] = pos_fora
+            analysis_packet['league_standings'] = classificacao
+            script = analysis_packet.get('analysis_summary', {}).get('selected_script', 'EQUILIBRADO')
+            stats_casa = analysis_packet.get('raw_data', {}).get('home_stats', {})
+            stats_fora = analysis_packet.get('raw_data', {}).get('away_stats', {})
+        else:
+            script = 'EQUILIBRADO'
+        
+        # Analisar todos os mercados COM OS PARÂMETROS CORRETOS (Phoenix V3.0 - unified signature)
+        analise_gols = analisar_mercado_gols(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None
+        analise_cantos = analisar_mercado_cantos(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None
         analise_btts = analisar_mercado_btts(stats_casa, stats_fora, odds, script)
-        analise_resultado = analisar_mercado_resultado_final(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora)
-        analise_cartoes = analisar_mercado_cartoes(stats_casa, stats_fora, odds, analysis_packet, script)
+        analise_resultado = analisar_mercado_resultado_final(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None
+        analise_cartoes = analisar_mercado_cartoes(analysis_packet, odds) if analysis_packet and 'error' not in analysis_packet else None
         analise_finalizacoes = analisar_mercado_finalizacoes(stats_casa, stats_fora, odds, analysis_packet, script)
         analise_handicaps = analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script)
 
@@ -1781,11 +1738,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'goals_only', 0)
         
         if paginated['analyses']:
-            from analysts.dossier_formatter import format_phoenix_dossier
+            from analysts.dossier_formatter import format_evidence_based_dossier
             
             for analysis_row in paginated['analyses']:
                 dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
-                formatted_msg = format_phoenix_dossier(dossier)
+                formatted_msg = format_evidence_based_dossier(dossier)
                 await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
             
             keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'goals_only', paginated['total_pages'])
@@ -1823,11 +1780,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'corners_only', 0)
         
         if paginated['analyses']:
-            from analysts.dossier_formatter import format_phoenix_dossier
+            from analysts.dossier_formatter import format_evidence_based_dossier
             
             for analysis_row in paginated['analyses']:
                 dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
-                formatted_msg = format_phoenix_dossier(dossier)
+                formatted_msg = format_evidence_based_dossier(dossier)
                 await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
             
             keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'corners_only', paginated['total_pages'])
@@ -1865,11 +1822,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'btts_only', 0)
         
         if paginated['analyses']:
-            from analysts.dossier_formatter import format_phoenix_dossier
+            from analysts.dossier_formatter import format_evidence_based_dossier
             
             for analysis_row in paginated['analyses']:
                 dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
-                formatted_msg = format_phoenix_dossier(dossier)
+                formatted_msg = format_evidence_based_dossier(dossier)
                 await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
             
             keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'btts_only', paginated['total_pages'])
@@ -1907,11 +1864,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'result_only', 0)
         
         if paginated['analyses']:
-            from analysts.dossier_formatter import format_phoenix_dossier
+            from analysts.dossier_formatter import format_evidence_based_dossier
             
             for analysis_row in paginated['analyses']:
                 dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
-                formatted_msg = format_phoenix_dossier(dossier)
+                formatted_msg = format_evidence_based_dossier(dossier)
                 await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
             
             keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'result_only', paginated['total_pages'])
@@ -2224,11 +2181,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
             return
         
-        from analysts.dossier_formatter import format_phoenix_dossier
+        from analysts.dossier_formatter import format_evidence_based_dossier
         
         for analysis_row in paginated['analyses']:
             dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
-            formatted_msg = format_phoenix_dossier(dossier)
+            formatted_msg = format_evidence_based_dossier(dossier)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
                 text=formatted_msg,

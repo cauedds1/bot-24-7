@@ -67,7 +67,7 @@ def apply_script_modifier_to_probability_corners(base_prob_pct, bet_type, tactic
     return min(max(modified_prob, 0.0), 100.0)
 
 
-def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, pos_casa="N/A", pos_fora="N/A", master_data=None, script_name=None):
+def analisar_mercado_cantos(analysis_packet, odds):
     """
     FUNÇÃO PRINCIPAL - Análise profunda do mercado de cantos.
     
@@ -77,20 +77,26 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
     - Team Corners: Home Over/Under 4.5, 5.5 / Away Over/Under 3.5, 4.5
     
     Args:
-        stats_casa: Estatísticas do time da casa
-        stats_fora: Estatísticas do time visitante
+        analysis_packet: Pacote completo do Master Analyzer
         odds: Dicionário de odds disponíveis
-        classificacao: Tabela de classificação da liga
-        pos_casa: Posição do time da casa
-        pos_fora: Posição do time visitante
-        master_data: Dados do master_analyzer (tactical script)
-        script_name: Nome do script tático
     
     Returns:
-        dict: Análise com lista de predições ou None
+        list: Lista de dicionários de predições ou lista vazia
     """
+    # Verificar se há erro no packet
+    if 'error' in analysis_packet:
+        return []
+    
+    # Extrair dados do analysis_packet
+    stats_casa = analysis_packet.get('raw_data', {}).get('home_stats', {})
+    stats_fora = analysis_packet.get('raw_data', {}).get('away_stats', {})
+    script_name = analysis_packet.get('analysis_summary', {}).get('selected_script', None)
+    classificacao = analysis_packet.get('league_standings', None)
+    pos_casa = analysis_packet.get('home_position', 'N/A')
+    pos_fora = analysis_packet.get('away_position', 'N/A')
+    
     if not stats_casa or not stats_fora:
-        return None
+        return []
 
     # STEP 1: EXTRAIR MÉTRICAS DE CANTOS
     cantos_casa_feitos = 0.0
@@ -99,9 +105,9 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
     cantos_fora_sofridos = 0.0
 
     use_weighted = False
-    if master_data and 'analysis_summary' in master_data:
-        weighted_home = master_data['analysis_summary'].get('weighted_metrics_home', {})
-        weighted_away = master_data['analysis_summary'].get('weighted_metrics_away', {})
+    if 'analysis_summary' in analysis_packet:
+        weighted_home = analysis_packet['analysis_summary'].get('weighted_metrics_home', {})
+        weighted_away = analysis_packet['analysis_summary'].get('weighted_metrics_away', {})
         
         if weighted_home and weighted_away:
             use_weighted = True

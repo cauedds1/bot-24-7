@@ -54,7 +54,7 @@ def apply_script_modifier_to_probability_cards(base_prob_pct, bet_type, tactical
     return min(max(modified_prob, 0.0), 100.0)
 
 
-def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, script_name=None):
+def analisar_mercado_cartoes(analysis_packet, odds):
     """
     FUNÇÃO PRINCIPAL - Análise profunda do mercado de cartões.
     
@@ -62,15 +62,21 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
     - Total Cards FT: Over/Under 3.5, 4.5, 5.5
     
     Args:
-        stats_casa: Estatísticas do time da casa
-        stats_fora: Estatísticas do time visitante
+        analysis_packet: Pacote completo do Master Analyzer
         odds: Dicionário de odds disponíveis
-        master_data: Dados do master_analyzer (tactical script)
-        script_name: Nome do script tático
     
     Returns:
         dict: Análise com lista de predições ou None
     """
+    # Verificar se há erro no packet
+    if 'error' in analysis_packet:
+        return None
+    
+    # Extrair dados do analysis_packet
+    stats_casa = analysis_packet.get('raw_data', {}).get('home_stats', {})
+    stats_fora = analysis_packet.get('raw_data', {}).get('away_stats', {})
+    script_name = analysis_packet.get('analysis_summary', {}).get('selected_script', None)
+    
     print(f"\n  🔍 CARTÕES V3.0: Iniciando análise profunda...")
     
     if not stats_casa or not stats_fora:
