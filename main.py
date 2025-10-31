@@ -42,6 +42,9 @@ analises_em_background = {}
 # Inicializar gerenciador de banco de dados
 db_manager = DatabaseManager()
 
+# Inicializar schema do banco de dados (criar tabelas se não existirem)
+db_manager.initialize_database()
+
 # Rate Limiting - Previne abuso de comandos
 user_command_timestamps = {}
 RATE_LIMIT_COMMANDS_PER_MINUTE = 10
