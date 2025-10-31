@@ -61,6 +61,30 @@ O bot é construído com uma arquitetura modular e production-ready, permitindo 
   - `DATABASE_URL` - URL de conexão PostgreSQL (opcional, mas recomendado)
 
 ## Recent Changes (2025-10-31)
+### Project Phoenix - Deep Analytics Protocol (LATEST)
+Implementação completa do protocolo "Deep Analytics" com análise profunda de múltiplos submercados e evidências detalhadas:
+
+**1. Analisadores Reconstruídos com Múltiplas Predições:**
+- `goals_analyzer_v2.py`: Retorna ~20 predições cobrindo Total Goals FT (1.5/2.5/3.5), HT Goals (0.5/1.5), BTTS (Sim/Não), Team Goals Home/Away (0.5/1.5)
+- `corners_analyzer.py`: Retorna ~12 predições cobrindo Total Corners FT (8.5/9.5/10.5/11.5), HT Corners (4.5/5.5), Team Corners Home (4.5/5.5/6.5) e Away (3.5/4.5/5.5)
+- `cards_analyzer.py`: Retorna ~6 predições cobrindo Total Cards (Over/Under 3.5, 4.5, 5.5)
+
+**2. Script-Based Probability Modifier:**
+Cada analisador implementa modificadores contextuais que ajustam probabilidades ANTES do cálculo de confiança, baseado em scripts táticos:
+- Gols: Ajusta para jogos ofensivos/defensivos/equilibrados
+- Cantos: Ajusta para times com estilos de posse/contra-ataque
+- Cartões: Ajusta para clássicos/rivais e times disciplinados/agressivos
+
+**3. Evidence-Based Dossier:**
+- `dossier_formatter.py`: Implementa formatação com template "Analyst's Dossier" incluindo evidências detalhadas dos últimos 4 jogos
+- `justification_generator.py`: Gera justificativas específicas e baseadas em dados para cada mercado
+- **Diversity Logic**: Nova função `_select_diverse_predictions()` garante variedade de mercados na seção "OUTRAS TENDÊNCIAS", evitando repetição de mercados
+
+**4. Integração Evidence-Based:**
+- Todas as análises agora incluem seção "📊 EVIDÊNCIAS" com dados reais dos últimos 4 jogos
+- Justificativas contextuais mencionam desempenho histórico específico de cada time
+- Formatação consistente seguindo o blueprint "Evidence-Based Analysis Protocol"
+
 ### Pure Analyst Protocol Implementation
 Refatoração arquitetural completa transformando o bot de um modelo "tipster" (focado em valor de mercado) para um "Pure Analyst" (análise estatística independente de odds). Todos os 8 módulos de análise foram atualizados para usar o sistema unificado de confiança sem filtragem por odds.
 
