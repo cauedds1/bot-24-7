@@ -2,7 +2,173 @@
 """
 Gerador de justificativas persuasivas e dinâmicas para apostas esportivas.
 Explica o "porquê" de cada sugestão de forma convincente e não-genérica.
+
+PHOENIX V3.0: Evidence-Based Analysis Protocol
 """
+
+
+def generate_evidence_based_justification(mercado, tipo, evidencias_home, evidencias_away, home_team_name, away_team_name):
+    """
+    EVIDENCE-BASED: Gera justificativa específica baseada nos dados reais dos últimos jogos.
+    
+    Conforme especificação do protocolo Evidence-Based Analysis, as justificativas devem ser:
+    - Específicas (mencionando médias reais)
+    - Factuais (baseadas em dados concretos)
+    - Não-genéricas (únicas para este jogo)
+    
+    Args:
+        mercado: Tipo de mercado ('Gols', 'Cantos', 'Cartões', etc.)
+        tipo: Tipo específico da análise
+        evidencias_home: Dict com evidências dos últimos jogos do time casa
+        evidencias_away: Dict com evidências dos últimos jogos do time fora
+        home_team_name: Nome do time casa
+        away_team_name: Nome do time fora
+    
+    Returns:
+        str: Justificativa baseada em evidências
+    
+    Exemplo Output:
+        "A média de gols nos jogos do Coritiba em casa é de apenas 1.0, enquanto a do CRB
+        como visitante é a mesma, reforçando a tendência de um jogo com poucos gols."
+    """
+    
+    if mercado == "Gols":
+        return _justificar_gols_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name)
+    elif mercado == "Cantos":
+        return _justificar_cantos_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name)
+    elif mercado == "Cartões":
+        return _justificar_cartoes_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name)
+    elif mercado == "Finalizações":
+        return _justificar_finalizacoes_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name)
+    else:
+        return f"Análise baseada nos dados recentes favorece {tipo}."
+
+
+def _justificar_gols_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name):
+    """Gera justificativa para Gols baseada em evidências reais"""
+    gols_home = evidencias_home.get('gols', [])
+    gols_away = evidencias_away.get('gols', [])
+    
+    if not gols_home or not gols_away:
+        return f"Análise estatística favorece {tipo} baseado no perfil das equipes."
+    
+    # Calcular média de gols totais nos últimos jogos
+    media_total_home = sum(g['total_goals'] for g in gols_home) / len(gols_home) if gols_home else 0
+    media_total_away = sum(g['total_goals'] for g in gols_away) / len(gols_away) if gols_away else 0
+    media_combinada = (media_total_home + media_total_away) / 2
+    
+    # Calcular média de gols marcados
+    media_marcados_home = sum(g['team_goals'] for g in gols_home) / len(gols_home) if gols_home else 0
+    media_marcados_away = sum(g['team_goals'] for g in gols_away) / len(gols_away) if gols_away else 0
+    
+    if "Over" in tipo or "Mais" in tipo:
+        return (
+            f"A média de gols totais nos jogos do {home_team_name} em casa é de {media_total_home:.1f}, "
+            f"enquanto a do {away_team_name} como visitante é de {media_total_away:.1f}, "
+            f"resultando em uma média combinada de {media_combinada:.1f} gols, "
+            f"favorecendo {tipo}."
+        )
+    elif "Under" in tipo or "Menos" in tipo:
+        return (
+            f"A média de gols nos jogos do {home_team_name} em casa é de apenas {media_total_home:.1f}, "
+            f"enquanto a do {away_team_name} como visitante é de {media_total_away:.1f}, "
+            f"reforçando a tendência de um jogo com poucos gols."
+        )
+    else:
+        return (
+            f"{home_team_name} marca {media_marcados_home:.1f} gols em casa, "
+            f"enquanto {away_team_name} marca {media_marcados_away:.1f} fora, "
+            f"favorecendo {tipo}."
+        )
+
+
+def _justificar_cantos_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name):
+    """Gera justificativa para Cantos baseada em evidências reais"""
+    cantos_home = evidencias_home.get('cantos', [])
+    cantos_away = evidencias_away.get('cantos', [])
+    
+    if not cantos_home or not cantos_away:
+        return f"Análise de volume de jogo favorece {tipo}."
+    
+    # Calcular médias
+    media_total_home = sum(c['total_corners'] for c in cantos_home) / len(cantos_home) if cantos_home else 0
+    media_total_away = sum(c['total_corners'] for c in cantos_away) / len(cantos_away) if cantos_away else 0
+    media_forcados_home = sum(c['corners_for'] for c in cantos_home) / len(cantos_home) if cantos_home else 0
+    media_forcados_away = sum(c['corners_for'] for c in cantos_away) / len(cantos_away) if cantos_away else 0
+    
+    media_combinada = (media_total_home + media_total_away) / 2
+    
+    if "Over" in tipo or "Mais" in tipo:
+        return (
+            f"{home_team_name} força {media_forcados_home:.1f} escanteios em casa (total médio de {media_total_home:.1f} por jogo), "
+            f"enquanto {away_team_name} força {media_forcados_away:.1f} fora (total médio de {media_total_away:.1f}). "
+            f"A média combinada de {media_combinada:.1f} escanteios favorece {tipo}."
+        )
+    elif "Under" in tipo or "Menos" in tipo:
+        return (
+            f"Nos últimos jogos, a média de escanteios foi de apenas {media_total_home:.1f} para {home_team_name} em casa "
+            f"e {media_total_away:.1f} para {away_team_name} fora, "
+            f"indicando baixo volume de jogo e favorecendo {tipo}."
+        )
+    else:
+        return f"Análise de escanteios favorece {tipo} com base nas médias recentes."
+
+
+def _justificar_cartoes_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name):
+    """Gera justificativa para Cartões baseada em evidências reais"""
+    cartoes_home = evidencias_home.get('cartoes', [])
+    cartoes_away = evidencias_away.get('cartoes', [])
+    
+    if not cartoes_home or not cartoes_away:
+        return f"Análise de disciplina favorece {tipo}."
+    
+    # Calcular médias
+    media_cartoes_home = sum(c['total_cards'] for c in cartoes_home) / len(cartoes_home) if cartoes_home else 0
+    media_cartoes_away = sum(c['total_cards'] for c in cartoes_away) / len(cartoes_away) if cartoes_away else 0
+    media_combinada = media_cartoes_home + media_cartoes_away
+    
+    if "Over" in tipo or "Mais" in tipo:
+        return (
+            f"{home_team_name} recebe uma média de {media_cartoes_home:.1f} cartões em casa, "
+            f"enquanto {away_team_name} recebe {media_cartoes_away:.1f} fora. "
+            f"A média combinada de {media_combinada:.1f} cartões indica jogo físico, favorecendo {tipo}."
+        )
+    elif "Under" in tipo or "Menos" in tipo:
+        return (
+            f"Ambos os times têm baixa média de cartões recentemente "
+            f"({home_team_name}: {media_cartoes_home:.1f}, {away_team_name}: {media_cartoes_away:.1f}), "
+            f"indicando jogo mais técnico e favorecendo {tipo}."
+        )
+    else:
+        return f"Análise de disciplina favorece {tipo}."
+
+
+def _justificar_finalizacoes_evidence_based(tipo, evidencias_home, evidencias_away, home_team_name, away_team_name):
+    """Gera justificativa para Finalizações baseada em evidências reais"""
+    shots_home = evidencias_home.get('finalizacoes', [])
+    shots_away = evidencias_away.get('finalizacoes', [])
+    
+    if not shots_home or not shots_away:
+        return f"Análise de volume ofensivo favorece {tipo}."
+    
+    # Calcular médias
+    media_shots_home = sum(s['shots_for'] for s in shots_home) / len(shots_home) if shots_home else 0
+    media_shots_away = sum(s['shots_for'] for s in shots_away) / len(shots_away) if shots_away else 0
+    media_total_home = sum(s['total_shots'] for s in shots_home) / len(shots_home) if shots_home else 0
+    media_total_away = sum(s['total_shots'] for s in shots_away) / len(shots_away) if shots_away else 0
+    
+    media_combinada = (media_total_home + media_total_away) / 2
+    
+    if "Over" in tipo or "Mais" in tipo:
+        return (
+            f"{home_team_name} finaliza {media_shots_home:.1f} vezes por jogo em casa "
+            f"({media_total_home:.1f} total), "
+            f"enquanto {away_team_name} finaliza {media_shots_away:.1f} fora "
+            f"({media_total_away:.1f} total). "
+            f"Alto volume ofensivo favorece {tipo}."
+        )
+    else:
+        return f"Análise de finalizações favorece {tipo} baseado no volume ofensivo recente."
 
 def generate_persuasive_justification(mercado, tipo, value_score, game_script=None, expectativa_gols=None, 
                                        quality_home=None, quality_away=None, odd=None, **kwargs):

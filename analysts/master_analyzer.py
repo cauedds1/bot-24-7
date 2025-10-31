@@ -752,16 +752,18 @@ async def _analyze_strength_of_schedule(team_id, league_id):
     }
 
 
-async def _calculate_weighted_metrics(team_id, league_id, sos_data):
+async def _calculate_weighted_metrics(team_id, league_id, sos_data, team_stats=None):
     """
-    TASK 2: Calcula métricas ponderadas por força do adversário (SoS).
+    TASK 2 FIXED: Calcula métricas ponderadas por força do adversário (SoS).
     
-    Ajusta estatísticas baseado na dificuldade dos oponentes enfrentados.
+    Com FALLBACK ROBUSTO: Se não conseguir calcular weighted metrics dos últimos jogos,
+    usa as médias simples das estatísticas gerais do time.
     
     Args:
         team_id: ID do time
         league_id: ID da liga
         sos_data: Dados de Strength of Schedule
+        team_stats: Estatísticas gerais do time (para fallback)
     
     Returns:
         dict: {
@@ -775,57 +777,181 @@ async def _calculate_weighted_metrics(team_id, league_id, sos_data):
     
     ultimos_jogos = await buscar_ultimos_jogos_time(team_id, limite=5)
     
-    if not ultimos_jogos:
+    # Tentar calcular weighted metrics dos últimos jogos
+    if ultimos_jogos and len(ultimos_jogos) > 0:
+        total_corners_for = 0
+        total_corners_against = 0
+        total_shots_for = 0
+        total_shots_against = 0
+        total_weight = 0
+        
+        opponents_qsc = sos_data.get('opponents_qsc', [])
+        
+        for idx, jogo in enumerate(ultimos_jogos[:5]):
+            stats = jogo.get('statistics', {})
+            
+            # Determinar se jogou em casa ou fora - acessar corretamente a estrutura aninhada
+            teams_data = jogo.get('teams', {})
+            home_team_id = teams_data.get('home', {}).get('id')
+            eh_casa = home_team_id == team_id
+            team_key = 'home' if eh_casa else 'away'
+            opponent_key = 'away' if eh_casa else 'home'
+            
+            # Extrair métricas
+            corners_for = int(stats.get(team_key, {}).get('Corner Kicks', 0) or 0)
+            corners_against = int(stats.get(opponent_key, {}).get('Corner Kicks', 0) or 0)
+            shots_for = int(stats.get(team_key, {}).get('Shots on Goal', 0) or 0)
+            shots_against = int(stats.get(opponent_key, {}).get('Shots on Goal', 0) or 0)
+            
+            # Calcular peso baseado no QSC do adversário
+            opponent_qsc = opponents_qsc[idx] if idx < len(opponents_qsc) else 50.0
+            weight = opponent_qsc / 50.0  # Normalizar (50 = peso 1.0)
+            
+            total_corners_for += corners_for * weight
+            total_corners_against += corners_against * weight
+            total_shots_for += shots_for * weight
+            total_shots_against += shots_against * weight
+            total_weight += weight
+        
+        if total_weight > 0:
+            weighted = {
+                'weighted_corners_for': total_corners_for / total_weight,
+                'weighted_corners_against': total_corners_against / total_weight,
+                'weighted_shots_for': total_shots_for / total_weight,
+                'weighted_shots_against': total_shots_against / total_weight
+            }
+            
+            # Verificar se conseguiu calcular algo válido (não tudo 0.0)
+            if any(v > 0 for v in weighted.values()):
+                print(f"    ✅ Weighted Metrics calculados com sucesso dos últimos jogos")
+                return weighted
+    
+    # 🛡️ FALLBACK ROBUSTO: Usar estimativas baseadas em stats gerais
+    print(f"    ⚠️ Weighted Metrics: Sem dados dos últimos jogos, usando FALLBACK com stats gerais")
+    
+    if not team_stats:
+        print(f"    ❌ Sem team_stats para fallback - retornando valores mínimos")
         return {
-            'weighted_corners_for': 0.0,
-            'weighted_corners_against': 0.0,
-            'weighted_shots_for': 0.0,
-            'weighted_shots_against': 0.0
+            'weighted_corners_for': 5.0,  # Valor padrão razoável
+            'weighted_corners_against': 5.0,
+            'weighted_shots_for': 10.0,
+            'weighted_shots_against': 10.0
         }
     
-    total_corners_for = 0
-    total_corners_against = 0
-    total_shots_for = 0
-    total_shots_against = 0
-    total_weight = 0
+    # Calcular fallback baseado em perfil tático
+    profile = _calculate_tactical_profile(team_stats)
     
-    opponents_qsc = sos_data.get('opponents_qsc', [])
+    fallback = {
+        'weighted_corners_for': profile.get('corners_for_avg', 5.0),
+        'weighted_corners_against': profile.get('corners_against_avg', 5.0),
+        'weighted_shots_for': profile.get('shots_for_avg', 10.0),
+        'weighted_shots_against': profile.get('shots_against_avg', 10.0)
+    }
     
-    for idx, jogo in enumerate(ultimos_jogos[:5]):
-        stats = jogo.get('statistics', {})
-        
-        # Determinar se jogou em casa ou fora - acessar corretamente a estrutura aninhada
+    print(f"    📊 FALLBACK aplicado: {fallback['weighted_corners_for']:.1f} cantos, {fallback['weighted_shots_for']:.1f} finalizações")
+    
+    return fallback
+
+
+def _extract_evidence_from_recent_games(ultimos_jogos, team_id, team_name):
+    """
+    EVIDENCE-BASED: Extrai evidências dos últimos jogos para usar no formato Evidence-Based.
+    
+    Retorna dados estruturados para cada mercado: gols, cantos, cartões, finalizações.
+    
+    Args:
+        ultimos_jogos: Lista dos últimos jogos do time
+        team_id: ID do time
+        team_name: Nome do time
+    
+    Returns:
+        dict: {
+            'gols': [...],
+            'cantos': [...],
+            'cartoes': [...],
+            'finalizacoes': [...]
+        }
+    """
+    evidencias = {
+        'gols': [],
+        'cantos': [],
+        'cartoes': [],
+        'finalizacoes': []
+    }
+    
+    if not ultimos_jogos:
+        return evidencias
+    
+    for jogo in ultimos_jogos[:4]:  # Últimos 4 jogos
+        # Determinar se jogou em casa ou fora
         teams_data = jogo.get('teams', {})
         home_team_id = teams_data.get('home', {}).get('id')
+        away_team_id = teams_data.get('away', {}).get('id')
+        
         eh_casa = home_team_id == team_id
         team_key = 'home' if eh_casa else 'away'
         opponent_key = 'away' if eh_casa else 'home'
         
-        # Extrair métricas
-        corners_for = int(stats.get(team_key, {}).get('Corner Kicks', 0) or 0)
-        corners_against = int(stats.get(opponent_key, {}).get('Corner Kicks', 0) or 0)
-        shots_for = int(stats.get(team_key, {}).get('Shots on Goal', 0) or 0)
-        shots_against = int(stats.get(opponent_key, {}).get('Shots on Goal', 0) or 0)
+        # Dados do adversário
+        opponent_name = teams_data.get(opponent_key, {}).get('name', 'Adversário')
         
-        # Calcular peso baseado no QSC do adversário
-        opponent_qsc = opponents_qsc[idx] if idx < len(opponents_qsc) else 50.0
-        weight = opponent_qsc / 50.0  # Normalizar (50 = peso 1.0)
+        # Dados dos gols
+        goals_data = jogo.get('goals', {})
+        team_goals = goals_data.get(team_key, 0) or 0
+        opponent_goals = goals_data.get(opponent_key, 0) or 0
+        total_goals = team_goals + opponent_goals
         
-        total_corners_for += corners_for * weight
-        total_corners_against += corners_against * weight
-        total_shots_for += shots_for * weight
-        total_shots_against += shots_against * weight
-        total_weight += weight
+        # Estatísticas do jogo
+        stats = jogo.get('statistics', {})
+        team_stats = stats.get(team_key, {})
+        opponent_stats = stats.get(opponent_key, {})
+        
+        # Escanteios
+        corners_for = int(team_stats.get('Corner Kicks', 0) or 0)
+        corners_against = int(opponent_stats.get('Corner Kicks', 0) or 0)
+        total_corners = corners_for + corners_against
+        
+        # Finalizações
+        shots_for = int(team_stats.get('Shots on Goal', 0) or 0)
+        shots_against = int(opponent_stats.get('Shots on Goal', 0) or 0)
+        total_shots = shots_for + shots_against
+        
+        # Cartões
+        yellow_cards = int(team_stats.get('Yellow Cards', 0) or 0)
+        red_cards = int(team_stats.get('Red Cards', 0) or 0)
+        total_cards = yellow_cards + red_cards
+        
+        # Adicionar evidências
+        evidencias['gols'].append({
+            'opponent': opponent_name,
+            'team_goals': team_goals,
+            'opponent_goals': opponent_goals,
+            'total_goals': total_goals,
+            'result': f"{team_goals}-{opponent_goals}"
+        })
+        
+        evidencias['cantos'].append({
+            'opponent': opponent_name,
+            'corners_for': corners_for,
+            'corners_against': corners_against,
+            'total_corners': total_corners
+        })
+        
+        evidencias['finalizacoes'].append({
+            'opponent': opponent_name,
+            'shots_for': shots_for,
+            'shots_against': shots_against,
+            'total_shots': total_shots
+        })
+        
+        evidencias['cartoes'].append({
+            'opponent': opponent_name,
+            'yellow_cards': yellow_cards,
+            'red_cards': red_cards,
+            'total_cards': total_cards
+        })
     
-    if total_weight == 0:
-        total_weight = 1
-    
-    return {
-        'weighted_corners_for': total_corners_for / total_weight,
-        'weighted_corners_against': total_corners_against / total_weight,
-        'weighted_shots_for': total_shots_for / total_weight,
-        'weighted_shots_against': total_shots_against / total_weight
-    }
+    return evidencias
 
 
 async def generate_match_analysis(jogo):
@@ -993,8 +1119,8 @@ async def generate_match_analysis(jogo):
     sos_away = await _analyze_strength_of_schedule(away_team_id, league_id)
     
     print("⚖️ TASK 2: Calculando Weighted Metrics (Métricas Ponderadas)...")
-    weighted_home = await _calculate_weighted_metrics(home_team_id, league_id, sos_home)
-    weighted_away = await _calculate_weighted_metrics(away_team_id, league_id, sos_away)
+    weighted_home = await _calculate_weighted_metrics(home_team_id, league_id, sos_home, home_stats)
+    weighted_away = await _calculate_weighted_metrics(away_team_id, league_id, sos_away, away_stats)
     print(f"  📊 Casa: {weighted_home['weighted_corners_for']:.1f} cantos | {weighted_home['weighted_shots_for']:.1f} finalizações (ponderado)")
     print(f"  📊 Fora: {weighted_away['weighted_corners_for']:.1f} cantos | {weighted_away['weighted_shots_for']:.1f} finalizações (ponderado)")
     
@@ -1039,6 +1165,17 @@ async def generate_match_analysis(jogo):
     print("🎲 Calculando probabilidades baseadas no script...")
     probabilities = _calculate_probabilities_from_script(script_name, power_home, power_away)
     
+    print("📊 EVIDENCE-BASED: Buscando últimos 4 jogos para evidências...")
+    from api_client import buscar_ultimos_jogos_time
+    ultimos_jogos_casa = await buscar_ultimos_jogos_time(home_team_id, limite=4)
+    ultimos_jogos_fora = await buscar_ultimos_jogos_time(away_team_id, limite=4)
+    
+    # Extrair evidências dos últimos jogos para cada mercado
+    evidencias_home = _extract_evidence_from_recent_games(ultimos_jogos_casa, home_team_id, home_team_name) if ultimos_jogos_casa else {}
+    evidencias_away = _extract_evidence_from_recent_games(ultimos_jogos_fora, away_team_id, away_team_name) if ultimos_jogos_fora else {}
+    
+    print(f"  ✅ Evidências extraídas: Casa ({len(evidencias_home.get('gols', []))} jogos) | Fora ({len(evidencias_away.get('gols', []))} jogos)")
+    
     analysis_packet = {
         'fixture_id': fixture_id,
         'analysis_summary': {
@@ -1059,6 +1196,12 @@ async def generate_match_analysis(jogo):
             'weighted_metrics_away': weighted_away
         },
         'calculated_probabilities': probabilities,
+        'evidence': {
+            'home': evidencias_home,
+            'away': evidencias_away,
+            'home_team_name': home_team_name,
+            'away_team_name': away_team_name
+        },
         'raw_data': {
             'home_stats': home_stats,
             'away_stats': away_stats,
@@ -1066,6 +1209,6 @@ async def generate_match_analysis(jogo):
         }
     }
     
-    print("✅ MASTER ANALYZER: Análise completa gerada com QSC, SoS e Weighted Metrics!\n")
+    print("✅ MASTER ANALYZER: Análise completa gerada com QSC, SoS, Weighted Metrics e Evidências!\n")
     
     return analysis_packet
