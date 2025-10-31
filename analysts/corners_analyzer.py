@@ -1,39 +1,56 @@
 # analysts/corners_analyzer.py
-from config import ODD_MINIMA_DE_VALOR, ODD_MINIMA_PENALIDADE, MIN_CONFIANCA_CANTOS, MIN_CONFIANCA_CANTOS_UNDER
-from analysts.context_analyzer import analisar_compatibilidade_ofensiva_defensiva
-from analysts.confidence_calculator import calculate_statistical_probability_corners_over, calculate_final_confidence
+"""
+PHOENIX V3.0 - CORNERS ANALYZER (REFATORADO)
+============================================
+UNIFIED CONFIDENCE SYSTEM: Usa exclusivamente confidence_calculator.py
+para todos os cálculos de confiança.
 
-def ajustar_confianca_por_odd(confianca_base, odd):
-    """Ajusta a confiança baseado na odd: penaliza odds muito altas."""
-    if odd < ODD_MINIMA_PENALIDADE:
-        return max(confianca_base - 1.0, MIN_CONFIANCA_CANTOS)
-    elif odd <= 2.5:
-        return confianca_base
-    elif odd <= 3.5:
-        return max(confianca_base - 0.5, MIN_CONFIANCA_CANTOS_UNDER)
-    elif odd <= 5.0:
-        return max(confianca_base - 1.5, MIN_CONFIANCA_CANTOS_UNDER)
-    else:
-        # Odds muito altas (> 5.0): penalização severa
-        return max(confianca_base - 2.5, MIN_CONFIANCA_CANTOS)
+ARQUITETURA:
+1. Calcular probabilidade estatística de cada mercado de cantos
+2. Chamar calculate_final_confidence para obter confiança final
+3. Usar breakdown para evidências e transparência
+"""
+
+from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CANTOS, MIN_CONFIANCA_CANTOS_UNDER
+from analysts.context_analyzer import analisar_compatibilidade_ofensiva_defensiva
+from analysts.confidence_calculator import (
+    calculate_statistical_probability_corners_over,
+    calculate_final_confidence
+)
+
 
 def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, pos_casa="N/A", pos_fora="N/A", master_data=None, script_name=None):
     """
-    Analisa mercado de cantos:
-    1. PRIORIDADE: Buscar odds com valor (apostas rentáveis)
-    2. FALLBACK: Gerar sugestão tática quando não há odds disponíveis
-    PHOENIX V2.0: Agora com sistema de VETO e ajuste de confiança por script.
+    Analisa mercado de cantos usando o sistema unificado de confiança.
+    
+    PHOENIX V3.0 REFACTORING:
+    - ✅ USA confidence_calculator.py para TODOS os cálculos
+    - ✅ Calcula probabilidade estatística primeiro
+    - ✅ Aplica modificadores contextuais via calculate_final_confidence
+    - ✅ Retorna breakdown para transparência
+    
+    Args:
+        stats_casa: Estatísticas do time da casa
+        stats_fora: Estatísticas do time visitante
+        odds: Dicionário de odds disponíveis
+        classificacao: Tabela de classificação da liga
+        pos_casa: Posição do time da casa
+        pos_fora: Posição do time visitante
+        master_data: Dados do master_analyzer (tactical script)
+        script_name: Nome do script tático
+    
+    Returns:
+        dict: Análise de cantos com palpites ou None
     """
     if not stats_casa or not stats_fora:
         return None
 
-    # Inicializar variáveis (para evitar erros LSP de unbound)
+    # ✅ STEP 1: EXTRAIR MÉTRICAS DE CANTOS (weighted ou simples)
     cantos_casa_feitos = 0.0
     cantos_casa_sofridos = 0.0
     cantos_fora_feitos = 0.0
     cantos_fora_sofridos = 0.0
 
-    # ✅ TASK 3a: USAR WEIGHTED METRICS SE DISPONÍVEL (ponderado por força do adversário)
     use_weighted = False
     if master_data and 'analysis_summary' in master_data:
         weighted_home = master_data['analysis_summary'].get('weighted_metrics_home', {})
@@ -58,13 +75,13 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
     print(f"     Casa: {cantos_casa_feitos:.1f} feitos / {cantos_casa_sofridos:.1f} sofridos")
     print(f"     Fora: {cantos_fora_feitos:.1f} feitos / {cantos_fora_sofridos:.1f} sofridos")
 
-    # 🛡️ SHIELD RULE: Se TODOS os valores são 0.0, retornar None imediatamente
+    # 🛡️ SHIELD RULE: Dados insuficientes
     if (cantos_casa_feitos == 0.0 and cantos_casa_sofridos == 0.0 and 
         cantos_fora_feitos == 0.0 and cantos_fora_sofridos == 0.0):
-        print(f"  ❌ CANTOS BLOQUEADO: Dados insuficientes (todos 0.0) - API não retornou stats")
+        print(f"  ❌ CANTOS BLOQUEADO: Dados insuficientes (todos 0.0)")
         return None
 
-    # Contexto: pressão ofensiva favorece cantos
+    # ✅ STEP 2: ANÁLISE CONTEXTUAL (insights que afetam cantos)
     insights = analisar_compatibilidade_ofensiva_defensiva(stats_casa, stats_fora)
     fator_cantos = 1.0
     contexto_insights = []
@@ -74,218 +91,340 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
             fator_cantos *= insight['fator_multiplicador']
             contexto_insights.append(insight['descricao'])
         elif insight['tipo'] == 'festival_gols':
-            fator_cantos *= 1.2  # Jogos com muitos gols tendem a ter muitos cantos
+            fator_cantos *= 1.2  # Jogos ofensivos geram mais cantos
             contexto_insights.append("⚡ Jogo ofensivo tende a gerar MAIS cantos!")
 
-    # ✅ TASK 3a FIX: Usar as variáveis já preenchidas (weighted ou simples)
+    # ✅ STEP 3: CALCULAR MÉDIAS ESPERADAS
     media_exp_ft = (cantos_casa_feitos + cantos_fora_sofridos + 
                     cantos_fora_feitos + cantos_casa_sofridos) / 2
     media_exp_ft_ajustada = media_exp_ft * fator_cantos
-    media_exp_ht = media_exp_ft_ajustada * 0.48
+    media_exp_ht = media_exp_ft_ajustada * 0.48  # HT = ~48% dos cantos
     media_casa = cantos_casa_feitos * (fator_cantos if fator_cantos > 1.0 else 1.0)
     media_fora = cantos_fora_feitos
 
+    print(f"  📊 Médias esperadas: FT={media_exp_ft_ajustada:.1f}, HT={media_exp_ht:.1f}, Casa={media_casa:.1f}, Fora={media_fora:.1f}")
+
     palpites = []
 
-    # 🔍 DEBUG: Mostrar quais odds de cantos estão disponíveis
+    # 🔍 DEBUG: Odds disponíveis
     odds_cantos_disponiveis = [k for k in odds.keys() if 'cantos' in k or 'corner' in k.lower()] if odds else []
-    print(f"  📊 DEBUG CANTOS - Odds disponíveis: {odds_cantos_disponiveis if odds_cantos_disponiveis else 'NENHUMA'}")
+    print(f"  📊 Odds de cantos disponíveis: {len(odds_cantos_disponiveis)}")
     
     if not odds or len(odds_cantos_disponiveis) == 0:
-        print(f"  ⚠️ CANTOS: Sem odds disponíveis na API - partindo para análise tática")
+        print(f"  ⚠️ CANTOS: Sem odds - partindo para análise tática")
+        # TODO: Análise tática sem odds
+        return None
 
-    # --- FT (Full Time) Total ---
-    # BUSCAR DINAMICAMENTE as linhas que EXISTEM na API (ao invés de linhas fixas)
-    if odds:
-        for odd_key, odd_value in odds.items():
-            if odd_key.startswith("cantos_ft_over_"):
-                try:
-                    linha = float(odd_key.replace("cantos_ft_over_", ""))
-                    requisito = linha + 0.3
-                    if media_exp_ft_ajustada >= requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Over {linha} Cantos"
-                        conf_base = min(round(5.0 + (media_exp_ft_ajustada - requisito) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        
-                        # LAYER 3 & 4: VETO e ajuste de confiança
-                        if script_name:
-                            
-                            
-                                continue
-                        
-                        if conf >= 5.0:
-                            palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Total"})
-                except ValueError:
+    # ✅ STEP 4: ANALISAR MERCADOS DINAMICAMENTE
+    
+    # --- FT (Full Time) OVER ---
+    for odd_key, odd_value in odds.items():
+        if odd_key.startswith("cantos_ft_over_"):
+            try:
+                linha = float(odd_key.replace("cantos_ft_over_", ""))
+                
+                # ✅ REFATORADO: Calcular probabilidade estatística
+                prob_pct = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_exp_ft_ajustada,
+                    line=linha,
+                    historical_frequency=None  # Pode adicionar frequência histórica no futuro
+                )
+                
+                # ✅ REFATORADO: Calcular confiança final via confidence_calculator
+                bet_type = f"Over {linha} Cantos"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_pct,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,  # Value score calculado externamente se necessário
+                    odd=odd_value
+                )
+                
+                print(f"     {bet_type}: Prob={prob_pct:.1f}% → Conf={conf_final:.1f} (odd={odd_value:.2f})")
+                
+                # ✅ Filtros de qualidade
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                    palpites.append({
+                        "tipo": bet_type,
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "FT",
+                        "time": "Total",
+                        "breakdown": breakdown,  # Transparência
+                        "probabilidade_estatistica": prob_pct
+                    })
+                    
+            except ValueError:
+                continue
+
+    # --- FT (Full Time) UNDER ---
+    for odd_key, odd_value in odds.items():
+        if odd_key.startswith("cantos_ft_under_"):
+            try:
+                linha = float(odd_key.replace("cantos_ft_under_", ""))
+                
+                # BLOQUEIO: Under < 7.5 não faz sentido para FT Total
+                if linha < 7.5:
                     continue
+                
+                # ✅ Probabilidade de UNDER = 100% - Probabilidade de OVER
+                prob_over = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_exp_ft_ajustada,
+                    line=linha,
+                    historical_frequency=None
+                )
+                prob_under = 100.0 - prob_over
+                
+                # ✅ Confiança final
+                bet_type = f"Under {linha} Cantos"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_under,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,
+                    odd=odd_value
+                )
+                
+                print(f"     {bet_type}: Prob={prob_under:.1f}% → Conf={conf_final:.1f} (odd={odd_value:.2f})")
+                
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                    palpites.append({
+                        "tipo": bet_type,
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "FT",
+                        "time": "Total",
+                        "breakdown": breakdown,
+                        "probabilidade_estatistica": prob_under
+                    })
+                    
+            except ValueError:
+                continue
 
-        # Under dinâmico (BLOQUEIO: Under < 7.5 não faz sentido para FT Total)
-        for odd_key, odd_value in odds.items():
-            if odd_key.startswith("cantos_ft_under_"):
-                try:
-                    linha = float(odd_key.replace("cantos_ft_under_", ""))
-                    if linha < 7.5:
-                        continue
-                    requisito = linha - 0.3
-                    if media_exp_ft_ajustada < requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Under {linha} Cantos"
-                        conf_base = min(round(5.0 + (requisito - media_exp_ft_ajustada) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        
-                        # LAYER 3 & 4: VETO e ajuste de confiança
-                        if script_name:
-                            
-                            
-                                continue
-                        
-                        if conf >= 5.5:
-                            palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Total"})
-                except ValueError:
-                    continue
+    # --- HT (Half Time) OVER ---
+    for odd_key, odd_value in odds.items():
+        if odd_key.startswith("cantos_ht_over_"):
+            try:
+                linha = float(odd_key.replace("cantos_ht_over_", ""))
+                
+                prob_pct = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_exp_ht,
+                    line=linha,
+                    historical_frequency=None
+                )
+                
+                bet_type = f"Over {linha} Cantos HT"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_pct,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,
+                    odd=odd_value
+                )
+                
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                    palpites.append({
+                        "tipo": f"Over {linha} HT",
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "HT",
+                        "time": "Total",
+                        "breakdown": breakdown,
+                        "probabilidade_estatistica": prob_pct
+                    })
+                    
+            except ValueError:
+                continue
 
-        # --- HT (Half Time) Total - DINÂMICO ---
-        for odd_key, odd_value in odds.items():
-            if odd_key.startswith("cantos_ht_over_"):
-                try:
-                    linha = float(odd_key.replace("cantos_ht_over_", ""))
-                    requisito = linha + 0.3
-                    if media_exp_ht >= requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Over {linha} Cantos HT"
-                        conf_base = min(round(5.0 + (media_exp_ht - requisito) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        if script_name:
-                            
-                            
-                                continue
-                        if conf >= 5.0:
-                            palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "HT", "time": "Total"})
-                except ValueError:
-                    continue
+    # --- HT (Half Time) UNDER ---
+    for odd_key, odd_value in odds.items():
+        if odd_key.startswith("cantos_ht_under_"):
+            try:
+                linha = float(odd_key.replace("cantos_ht_under_", ""))
+                
+                prob_over = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_exp_ht,
+                    line=linha,
+                    historical_frequency=None
+                )
+                prob_under = 100.0 - prob_over
+                
+                bet_type = f"Under {linha} Cantos HT"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_under,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,
+                    odd=odd_value
+                )
+                
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                    palpites.append({
+                        "tipo": f"Under {linha} HT",
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "HT",
+                        "time": "Total",
+                        "breakdown": breakdown,
+                        "probabilidade_estatistica": prob_under
+                    })
+                    
+            except ValueError:
+                continue
 
-        for odd_key, odd_value in odds.items():
-            if odd_key.startswith("cantos_ht_under_"):
-                try:
-                    linha = float(odd_key.replace("cantos_ht_under_", ""))
-                    requisito = linha - 0.3
-                    if media_exp_ht < requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Under {linha} Cantos HT"
-                        conf_base = min(round(5.0 + (requisito - media_exp_ht) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        if script_name:
-                            
-                            
-                                continue
-                        if conf >= 5.5:
-                            palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "HT", "time": "Total"})
-                except ValueError:
-                    continue
+    # --- CASA (Home Corners) OVER/UNDER ---
+    for odd_key, odd_value in odds.items():
+        if odd_key.startswith("cantos_casa_over_"):
+            try:
+                linha = float(odd_key.replace("cantos_casa_over_", ""))
+                
+                prob_pct = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_casa,
+                    line=linha,
+                    historical_frequency=None
+                )
+                
+                bet_type = f"Over {linha} Cantos Casa"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_pct,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,
+                    odd=odd_value
+                )
+                
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                    palpites.append({
+                        "tipo": f"Over {linha} Casa",
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "FT",
+                        "time": "Casa",
+                        "breakdown": breakdown,
+                        "probabilidade_estatistica": prob_pct
+                    })
+                    
+            except ValueError:
+                continue
+                
+        elif odd_key.startswith("cantos_casa_under_"):
+            try:
+                linha = float(odd_key.replace("cantos_casa_under_", ""))
+                
+                prob_over = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_casa,
+                    line=linha,
+                    historical_frequency=None
+                )
+                prob_under = 100.0 - prob_over
+                
+                bet_type = f"Under {linha} Cantos Casa"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_under,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,
+                    odd=odd_value
+                )
+                
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                    palpites.append({
+                        "tipo": f"Under {linha} Casa",
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "FT",
+                        "time": "Casa",
+                        "breakdown": breakdown,
+                        "probabilidade_estatistica": prob_under
+                    })
+                    
+            except ValueError:
+                continue
 
-        # --- CASA (Home Corners) - DINÂMICO ---
-        for odd_key, odd_value in odds.items():
-            if odd_key.startswith("cantos_casa_over_"):
-                try:
-                    linha = float(odd_key.replace("cantos_casa_over_", ""))
-                    requisito = linha + 0.3
-                    if media_casa >= requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Over {linha} Cantos Casa"
-                        conf_base = min(round(5.0 + (media_casa - requisito) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        if script_name:
-                            
-                            
-                                continue
-                        if conf >= 5.0:
-                            palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Casa"})
-                except ValueError:
-                    continue
+    # --- FORA (Away Corners) OVER/UNDER ---
+    for odd_key, odd_value in odds.items():
+        if odd_key.startswith("cantos_fora_over_"):
+            try:
+                linha = float(odd_key.replace("cantos_fora_over_", ""))
+                
+                prob_pct = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_fora,
+                    line=linha,
+                    historical_frequency=None
+                )
+                
+                bet_type = f"Over {linha} Cantos Fora"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_pct,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,
+                    odd=odd_value
+                )
+                
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS:
+                    palpites.append({
+                        "tipo": f"Over {linha} Fora",
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "FT",
+                        "time": "Fora",
+                        "breakdown": breakdown,
+                        "probabilidade_estatistica": prob_pct
+                    })
+                    
+            except ValueError:
+                continue
+                
+        elif odd_key.startswith("cantos_fora_under_"):
+            try:
+                linha = float(odd_key.replace("cantos_fora_under_", ""))
+                
+                prob_over = calculate_statistical_probability_corners_over(
+                    weighted_corners_avg=media_fora,
+                    line=linha,
+                    historical_frequency=None
+                )
+                prob_under = 100.0 - prob_over
+                
+                bet_type = f"Under {linha} Cantos Fora"
+                conf_final, breakdown = calculate_final_confidence(
+                    statistical_probability_pct=prob_under,
+                    bet_type=bet_type,
+                    tactical_script=script_name,
+                    value_score_pct=0.0,
+                    odd=odd_value
+                )
+                
+                if odd_value >= ODD_MINIMA_DE_VALOR and conf_final >= MIN_CONFIANCA_CANTOS_UNDER:
+                    palpites.append({
+                        "tipo": f"Under {linha} Fora",
+                        "confianca": conf_final,
+                        "odd": odd_value,
+                        "periodo": "FT",
+                        "time": "Fora",
+                        "breakdown": breakdown,
+                        "probabilidade_estatistica": prob_under
+                    })
+                    
+            except ValueError:
+                continue
 
-            elif odd_key.startswith("cantos_casa_under_"):
-                try:
-                    linha = float(odd_key.replace("cantos_casa_under_", ""))
-                    requisito = linha - 0.3
-                    if media_casa < requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Under {linha} Cantos Casa"
-                        conf_base = min(round(5.0 + (requisito - media_casa) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        if script_name:
-                            
-                            
-                                continue
-                        if conf >= 5.5:
-                            palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Casa"})
-                except ValueError:
-                    continue
-
-        # --- FORA (Away Corners) - DINÂMICO ---
-        for odd_key, odd_value in odds.items():
-            if odd_key.startswith("cantos_fora_over_"):
-                try:
-                    linha = float(odd_key.replace("cantos_fora_over_", ""))
-                    requisito = linha + 0.3
-                    if media_fora >= requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Over {linha} Cantos Fora"
-                        conf_base = min(round(5.0 + (media_fora - requisito) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        if script_name:
-                            
-                            
-                                continue
-                        if conf >= 5.0:
-                            palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Fora"})
-                except ValueError:
-                    continue
-
-            elif odd_key.startswith("cantos_fora_under_"):
-                try:
-                    linha = float(odd_key.replace("cantos_fora_under_", ""))
-                    requisito = linha - 0.3
-                    if media_fora < requisito and odd_value >= ODD_MINIMA_DE_VALOR:
-                        tipo_palpite = f"Under {linha} Cantos Fora"
-                        conf_base = min(round(5.0 + (requisito - media_fora) * 2.0, 1), 9.5)
-                        conf = ajustar_confianca_por_odd(conf_base, odd_value)
-                        if script_name:
-                            
-                            
-                                continue
-                        if conf >= 5.5:
-                            palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Fora"})
-                except ValueError:
-                    continue
-
-    print(f"  DEBUG CANTOS FINAL: {len(palpites)} palpites encontrados. Media_exp={media_exp_ft_ajustada:.1f}, Media_casa={media_casa:.1f}, Media_fora={media_fora:.1f}")
-
+    # ✅ RETORNO FINAL
+    print(f"  ✅ CANTOS: {len(palpites)} palpites gerados")
+    
     if palpites:
-        print(f"  ✅ CANTOS: Retornando {len(palpites)} palpites com odds")
         contexto_str = ""
         if contexto_insights:
-            contexto_str = f"   - <b>💡 Contexto:</b> {contexto_insights[0][:120]}...\n" if len(contexto_insights[0]) > 120 else f"   - <b>💡 Contexto:</b> {contexto_insights[0]}\n"
+            contexto_str = f"   - <b>💡 Contexto:</b> {contexto_insights[0]}\n"
 
-        suporte = (f"   - <b>Expectativa Total:</b> {round(media_exp_ft, 2)} → {round(media_exp_ft_ajustada, 2)} (ajustada)\n"
-                   f"   - <b>Casa:</b> {stats_casa['casa']['cantos_feitos']:.1f} → {media_casa:.1f} cantos/jogo\n"
+        suporte = (f"   - <b>Expectativa Total:</b> {media_exp_ft:.1f} → {media_exp_ft_ajustada:.1f} (ajustada)\n"
+                   f"   - <b>Casa:</b> {cantos_casa_feitos:.1f} cantos/jogo\n"
+                   f"   - <b>Fora:</b> {cantos_fora_feitos:.1f} cantos/jogo\n"
                    f"{contexto_str}")
+        
         return {"mercado": "Cantos", "palpites": palpites, "dados_suporte": suporte}
     
-    if master_data:
-        print(f"  🧠 CANTOS: Sem odds, gerando SUGESTÃO TÁTICA baseada em análise contextual")
-        from analysts.contextual_analyzer import ContextualAnalyzer
-        
-        analista = ContextualAnalyzer(master_data)
-        insight = analista.analisar_cantos_contextual()
-        
-        palpite_tatico = {
-            "tipo": insight.sugestao,
-            "confianca": insight.confianca,
-            "odd": None,
-            "periodo": "FT",
-            "time": "Total",
-            "narrativa_tatica": insight.narrativa,
-            "evidencias": insight.evidencias
-        }
-        
-        suporte = (f"   - <b>🧠 Análise Tática (sem odd disponível):</b>\n"
-                   f"{insight.narrativa}\n\n"
-                   f"   - <b>Evidências:</b>\n" + "\n".join([f"      {e}" for e in insight.evidencias]))
-        
-        return {"mercado": "Cantos", "palpites": [palpite_tatico], "dados_suporte": suporte, "tatico_apenas": True}
-    
-    print(f"  ❌ CANTOS: Sem odds e sem master_data para análise tática")
+    # Fallback: Análise tática sem odds (TODO)
+    print(f"  ❌ CANTOS: Nenhum palpite passou nos filtros de qualidade")
     return None
