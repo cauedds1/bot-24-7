@@ -2150,20 +2150,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         print(f"--- ✅ BUSCAR JOGO: Análise retornada (sucesso: {bool(analise_completa)}) ---")
         
         if analise_completa:
-            await context.bot.send_message(
-                query.message.chat_id,
-                analise_completa,
-                parse_mode='HTML'
-            )
-            
-            # Botão para analisar outro jogo ou voltar
+            # Anexar botões diretamente à mensagem de análise
             keyboard = [
                 [InlineKeyboardButton("🔍 Analisar Outro Jogo", callback_data='buscar_jogo')],
                 [InlineKeyboardButton("🔙 Voltar ao Menu", callback_data='voltar_menu')]
             ]
             await context.bot.send_message(
                 query.message.chat_id,
-                "✅ <b>Análise completa!</b>\n\nTodos os mercados foram analisados.",
+                analise_completa,
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='HTML'
             )
