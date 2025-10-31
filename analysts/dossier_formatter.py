@@ -417,6 +417,121 @@ def _format_avisos(avisos: List[str]) -> str:
     return msg
 
 
+def format_confidence_debug_report(
+    jogo: Dict,
+    all_predictions: Dict,
+    master_analysis: Dict,
+    threshold: float = 7.0
+) -> str:
+    """
+    MODO VERBOSO: Relatório de depuração de confiança.
+    Mostra TODOS os palpites (aprovados e reprovados) com detalhamento completo do cálculo de confiança.
+    
+    Args:
+        jogo: Dados do jogo
+        all_predictions: Dicionário com TODOS os palpites de todos os mercados
+        master_analysis: Análise completa do Master Analyzer
+        threshold: Threshold de confiança para aprovação (padrão: 7.0)
+    
+    Returns:
+        str: Relatório de depuração formatado
+    """
+    time_casa = jogo['teams']['home']['name']
+    time_fora = jogo['teams']['away']['name']
+    liga_nome = jogo['league']['name']
+    script_name = master_analysis.get('analysis_summary', {}).get('selected_script', 'N/A')
+    
+    # Header
+    msg = "--- 🕵️‍♂️ RELATÓRIO DE DEPURAÇÃO DE CONFIANÇA 🕵️‍♂️ ---\n\n"
+    msg += f"JOGO: {time_casa} vs {time_fora}\n"
+    msg += f"LIGA: {liga_nome}\n"
+    msg += f"SCRIPT TÁTICO: {script_name}\n"
+    msg += f"THRESHOLD DE APROVAÇÃO: {threshold:.1f}\n\n"
+    
+    # Processar cada mercado
+    mercados_ordem = ['Gols', 'Resultado', 'Cantos', 'BTTS', 'Cartões', 'Finalizações', 'Handicaps']
+    
+    for mercado_nome in mercados_ordem:
+        if mercado_nome not in all_predictions or not all_predictions[mercado_nome]:
+            continue
+        
+        mercado_data = all_predictions[mercado_nome]
+        palpites = mercado_data.get('palpites', [])
+        
+        if not palpites:
+            continue
+        
+        msg += f"--- MERCADO: {mercado_nome.upper()} ---\n"
+        
+        for palpite in palpites:
+            tipo = palpite.get('tipo', 'N/A')
+            confianca = palpite.get('confianca', 0.0)
+            odd = palpite.get('odd')
+            breakdown = palpite.get('confidence_breakdown', {})
+            
+            msg += f"Palpite: {tipo}\n"
+            
+            # Mostrar breakdown se disponível
+            if breakdown:
+                # Formatar probabilidade base
+                prob_base = breakdown.get('probabilidade_base')
+                if isinstance(prob_base, (int, float)):
+                    msg += f"- Probabilidade Base: {prob_base:.1f}%\n"
+                else:
+                    msg += f"- Probabilidade Base: N/A\n"
+                
+                # Formatar confiança base
+                conf_base = breakdown.get('confianca_base')
+                if isinstance(conf_base, (int, float)):
+                    msg += f"- Base Score: {conf_base:.1f}\n"
+                else:
+                    msg += f"- Base Score: N/A\n"
+                
+                # Formatar modificadores com verificação de tipo
+                mod_script = breakdown.get('modificador_script', 0)
+                mod_value = breakdown.get('modificador_value', 0)
+                mod_odd = breakdown.get('modificador_odd', 0)
+                
+                if isinstance(mod_script, (int, float)):
+                    msg += f"- Modificador Script: {mod_script:+.1f}\n"
+                else:
+                    msg += f"- Modificador Script: N/A\n"
+                
+                if isinstance(mod_value, (int, float)):
+                    msg += f"- Modificador Value: {mod_value:+.1f}\n"
+                else:
+                    msg += f"- Modificador Value: N/A\n"
+                
+                if isinstance(mod_odd, (int, float)):
+                    msg += f"- Modificador Odd: {mod_odd:+.1f}\n"
+                else:
+                    msg += f"- Modificador Odd: N/A\n"
+            else:
+                msg += f"- Confiança Calculada: {confianca:.1f}\n"
+                msg += f"- (Breakdown não disponível para este mercado)\n"
+            
+            msg += f"- FINAL SCORE: {confianca:.1f}\n"
+            
+            if odd:
+                msg += f"- ODD: @{odd:.2f}\n"
+            else:
+                msg += f"- ODD: Não disponível\n"
+            
+            # Status
+            if confianca >= threshold:
+                msg += f"- STATUS: ✅ APROVADO (Acima do threshold {threshold:.1f})\n"
+            else:
+                msg += f"- STATUS: ❌ REPROVADO (Abaixo do threshold {threshold:.1f})\n"
+            
+            msg += "\n"
+        
+        msg += "\n"
+    
+    msg += "--- FIM DO RELATÓRIO ---\n"
+    
+    return msg
+
+
 # Manter compatibilidade com código existente
 def format_phoenix_dossier(*args, **kwargs):
     """Wrapper para compatibilidade"""

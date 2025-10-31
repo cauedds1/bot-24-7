@@ -63,7 +63,8 @@ def extract_goals_suggestions(analysis_packet, odds):
                     "odd": odds['gols_ft_over_2.5'],
                     "periodo": "FT",
                     "time": "Total",
-                    "probabilidade": over_2_5_prob
+                    "probabilidade": over_2_5_prob,
+                    "confidence_breakdown": breakdown
                 })
     
     if 'gols_ft_under_2.5' in odds and odds['gols_ft_under_2.5'] >= ODD_MINIMA_DE_VALOR:
@@ -87,7 +88,8 @@ def extract_goals_suggestions(analysis_packet, odds):
                     "odd": odds['gols_ft_under_2.5'],
                     "periodo": "FT",
                     "time": "Total",
-                    "probabilidade": under_2_5_prob
+                    "probabilidade": under_2_5_prob,
+                    "confidence_breakdown": breakdown
                 })
     
     if 'gols_ft_over_1.5' in odds and odds['gols_ft_over_1.5'] >= ODD_MINIMA_DE_VALOR:
@@ -112,7 +114,8 @@ def extract_goals_suggestions(analysis_packet, odds):
                     "odd": odds['gols_ft_over_1.5'],
                     "periodo": "FT",
                     "time": "Total",
-                    "probabilidade": over_1_5_prob
+                    "probabilidade": over_1_5_prob,
+                    "confidence_breakdown": breakdown
                 })
     
     if 'gols_ft_over_3.5' in odds and odds['gols_ft_over_3.5'] >= ODD_MINIMA_DE_VALOR:
@@ -138,7 +141,8 @@ def extract_goals_suggestions(analysis_packet, odds):
                         "odd": odds['gols_ft_over_3.5'],
                         "periodo": "FT",
                         "time": "Total",
-                        "probabilidade": over_3_5_prob
+                        "probabilidade": over_3_5_prob,
+                        "confidence_breakdown": breakdown
                     })
     
     if not palpites:

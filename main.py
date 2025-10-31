@@ -1544,6 +1544,36 @@ async def getlog_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except Exception as e:
         await update.message.reply_text(f"❌ Erro ao ler arquivo de log: {str(e)}")
 
+async def debug_confianca_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Comando /debug_confianca - Ativa modo verboso de depuração de confiança"""
+    user_id = update.effective_user.id
+    
+    if not check_rate_limit(user_id):
+        await update.message.reply_text(
+            "⚠️ <b>Limite de Requisições Excedido</b>\n\n"
+            "Você está enviando comandos muito rapidamente.\n"
+            f"Por favor, aguarde alguns segundos antes de tentar novamente.",
+            parse_mode='HTML'
+        )
+        return
+    
+    await update.message.reply_text(
+        "🕵️‍♂️ <b>MODO DE DEPURAÇÃO DE CONFIANÇA</b>\n\n"
+        "Este comando mostra como a pontuação de confiança de cada palpite é calculada.\n\n"
+        "📋 <b>Como usar:</b>\n"
+        "1. Use o menu principal para escolher 'Jogos do Dia' ou 'Por Liga'\n"
+        "2. Selecione um jogo específico\n"
+        "3. O relatório de depuração mostrá:\n"
+        "   • Probabilidade base de cada palpite\n"
+        "   • Base score (conversão da probabilidade)\n"
+        "   • Modificadores aplicados (script, value, odd)\n"
+        "   • Score final\n"
+        "   • Status (aprovado/reprovado)\n\n"
+        "💡 Isso ajuda a identificar por que certos palpites são ou não recomendados.\n\n"
+        "ℹ️ <i>Nota: Esta é uma funcionalidade de depuração para calibração do modelo de confiança.</i>",
+        parse_mode='HTML'
+    )
+
 async def processar_um_jogo(jogo, idx_total, filtro_mercado, filtro_tipo_linha):
     """Processa um único jogo (async) - verifica cache primeiro"""
     cache_key = f"analise_jogo_{jogo['fixture']['id']}_{filtro_mercado}_{filtro_tipo_linha}"
@@ -2739,6 +2769,7 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("limpar_cache", limpar_cache_command))
     application.add_handler(CommandHandler("getlog", getlog_command))
+    application.add_handler(CommandHandler("debug_confianca", debug_confianca_command))
     application.add_handler(CallbackQueryHandler(button_handler))
 
     print(f"AnalytipsBot iniciado! Escutando...")
