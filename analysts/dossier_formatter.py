@@ -303,6 +303,60 @@ def _format_finalizacoes_evidence(evidencias_home, evidencias_away, home_team_na
     return msg
 
 
+def _select_diverse_predictions(palpites: List[Dict], max_predictions: int = 5) -> List[Dict]:
+    """
+    ACTION 2.2 - DIVERSITY LOGIC: Seleciona predições garantindo variedade de mercados.
+    
+    Se as top 5 predições são todas do mesmo mercado (ex: "Finalizações"),
+    selecionamos a melhor predição de cada mercado diferente para apresentar
+    um relatório variado e útil.
+    
+    Args:
+        palpites: Lista de predições ordenadas por confiança (desc)
+        max_predictions: Número máximo de predições a retornar
+    
+    Returns:
+        Lista de predições com máxima diversidade de mercados
+    """
+    if not palpites:
+        return []
+    
+    diverse_predictions = []
+    mercados_usados = set()
+    
+    # Primeira passagem: selecionar a melhor predição de cada mercado
+    for palpite in palpites:
+        mercado = palpite.get('mercado', 'Gols')
+        
+        if mercado not in mercados_usados:
+            diverse_predictions.append(palpite)
+            mercados_usados.add(mercado)
+            
+            if len(diverse_predictions) >= max_predictions:
+                break
+    
+    # Segunda passagem: se ainda temos espaço, adicionar segundas melhores de cada mercado
+    if len(diverse_predictions) < max_predictions:
+        mercados_segunda_rodada = set()
+        
+        for palpite in palpites:
+            if len(diverse_predictions) >= max_predictions:
+                break
+                
+            mercado = palpite.get('mercado', 'Gols')
+            
+            # Já adicionamos este palpite na primeira passagem?
+            if palpite in diverse_predictions:
+                continue
+            
+            # Podemos adicionar uma segunda predição deste mercado?
+            if mercado not in mercados_segunda_rodada:
+                diverse_predictions.append(palpite)
+                mercados_segunda_rodada.add(mercado)
+    
+    return diverse_predictions
+
+
 def _format_sugestoes_taticas_evidence_based(
     palpites: List[Dict],
     evidencias_home: Dict,
@@ -310,13 +364,20 @@ def _format_sugestoes_taticas_evidence_based(
     home_team_name: str,
     away_team_name: str
 ) -> str:
-    """Formata SUGESTÕES TÁTICAS com evidências (todas as outras análises)"""
+    """
+    Formata SUGESTÕES TÁTICAS com evidências (todas as outras análises).
+    
+    IMPLEMENTA DIVERSITY LOGIC: Garante variedade de mercados nas sugestões.
+    """
     if not palpites:
         return ""
     
-    msg = f"🧠 SUGESTÕES TÁTICAS (OUTRAS ANÁLISES DE VALOR)\n\n"
+    # ACTION 2.2: Aplicar lógica de diversidade
+    diverse_palpites = _select_diverse_predictions(palpites, max_predictions=5)
     
-    for palpite in palpites[:5]:  # Máximo 5 sugestões adicionais
+    msg = f"🧠 OUTRAS TENDÊNCIAS DE ALTA CONFIANÇA\n\n"
+    
+    for palpite in diverse_palpites:
         mercado = palpite.get('mercado', 'Gols')
         tipo = palpite.get('tipo', '')
         confianca = palpite.get('confianca', 0)
