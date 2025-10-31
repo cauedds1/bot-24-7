@@ -912,8 +912,9 @@ async def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
                 print(f"        Cartões Fora: {cartoes_amarelos_fora_soma} amarelos / {cartoes_vermelhos_fora_soma} vermelhos")
 
         # Preservar campos essenciais do API para cálculo de QSC Dinâmico
-        form_string = data.get('form', '')
-        goals_raw = data.get('goals', {})
+        # 🔧 FIX: Garantir que nunca seja None (API pode retornar None explicitamente)
+        form_string = data.get('form') or ''
+        goals_raw = data.get('goals') or {}
         
         print(f"  📋 Campos essenciais capturados:")
         print(f"     Form: '{form_string}' (len: {len(form_string)})")
