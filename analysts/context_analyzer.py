@@ -121,27 +121,6 @@ def calculate_dynamic_qsc(team_stats, team_id, classificacao=None, team_name=Non
     return qsc_final
 
 
-def get_quality_scores(home_team_id: int, away_team_id: int):
-    """
-    Retorna os quality scores ESTÁTICOS (qualidade técnica) dos times.
-    NOTA: Esta função está deprecada. Use calculate_dynamic_qsc() para QSC dinâmico.
-    
-    Args:
-        home_team_id: ID do time da casa
-        away_team_id: ID do time visitante
-    
-    Returns:
-        tuple: (home_quality, away_quality) - Scores de 1 a 100
-               Times não encontrados recebem score padrão de 70
-    """
-    DEFAULT_QUALITY = 70
-    
-    home_quality = QUALITY_SCORES.get(home_team_id, DEFAULT_QUALITY)
-    away_quality = QUALITY_SCORES.get(away_team_id, DEFAULT_QUALITY)
-    
-    return home_quality, away_quality
-
-
 def analisar_compatibilidade_ofensiva_defensiva(stats_casa, stats_fora):
     """
     Analisa se o ataque de um time se encaixa bem contra a defesa do outro.
@@ -324,173 +303,21 @@ def gerar_analise_contextual_completa(stats_casa, stats_fora, classificacao, pos
     return relatorio
 
 
-def definir_perfil_partida(stats_casa, stats_fora):
-    """
-    Define o PERFIL da partida analisando o CONTEXTO, não apenas números.
-    Retorna o perfil e quais mercados fazem SENTIDO para este jogo.
-
-    Perfis possíveis:
-    - OFENSIVO: Jogo aberto, muitos gols esperados
-    - DEFENSIVO: Jogo truncado, poucas chances
-    - EQUILIBRADO: Jogo disputado, resultado incerto
-    - PRESSÃO_CASA: Casa domina, visitante se fecha
-    - VISITANTE_PERIGOSO: Visitante forte, casa vulnerável
-    """
-    gols_casa_marcados = stats_casa['casa']['gols_marcados']
-    gols_casa_sofridos = stats_casa['casa']['gols_sofridos']
-    gols_fora_marcados = stats_fora['fora']['gols_marcados']
-    gols_fora_sofridos = stats_fora['fora']['gols_sofridos']
-
-    cantos_casa = stats_casa['casa'].get('cantos_feitos', 0)
-    cantos_fora = stats_fora['fora'].get('cantos_feitos', 0)
-
-    cartoes_casa = stats_casa['casa'].get('cartoes_amarelos', 0) + stats_casa['casa'].get('cartoes_vermelhos', 0)
-    cartoes_fora = stats_fora['fora'].get('cartoes_amarelos', 0) + stats_fora['fora'].get('cartoes_vermelhos', 0)
-
-    # Análise do perfil
-    perfil = {
-        'tipo': None,
-        'descricao': '',
-        'mercados_prioritarios': [],
-        'mercados_secundarios': [],
-        'mercados_evitar': []
-    }
-
-    # PERFIL 1: FESTIVAL DE GOLS (ambos atacam bem E defendem mal)
-    if (gols_casa_marcados >= 1.6 and gols_fora_marcados >= 1.2 and 
-        gols_casa_sofridos >= 1.2 and gols_fora_sofridos >= 1.2):
-        perfil['tipo'] = 'FESTIVAL_GOLS'
-        perfil['descricao'] = '🎆 JOGO OFENSIVO - Ambos atacam e defendem mal. Muitos gols esperados!'
-        perfil['mercados_prioritarios'] = ['gols', 'btts']
-        perfil['mercados_secundarios'] = ['cantos', 'finalizações', 'cartões']
-        perfil['mercados_evitar'] = []
-
-    # PERFIL 2: JOGO TRAVADO (ambas defesas sólidas)
-    elif gols_casa_sofridos <= 0.9 and gols_fora_sofridos <= 0.9:
-        perfil['tipo'] = 'JOGO_TRAVADO'
-        perfil['descricao'] = '🛡️ JOGO DEFENSIVO - Defesas sólidas. Poucos gols esperados.'
-        perfil['mercados_prioritarios'] = ['gols']  # Apenas under gols
-        perfil['mercados_secundarios'] = ['resultado', 'cantos', 'finalizações', 'cartões']
-        perfil['mercados_evitar'] = ['btts']  # Evita apenas BTTS (ambos marcarem é improvável)
-
-    # PERFIL 3: CASA DOMINANTE (casa forte, fora fraco)
-    elif gols_casa_marcados >= 1.8 and gols_fora_marcados <= 1.0 and cantos_casa >= 5.5:
-        perfil['tipo'] = 'PRESSAO_CASA'
-        perfil['descricao'] = '⚔️ PRESSÃO DA CASA - Casa domina e pressiona. Visitante se fecha.'
-        perfil['mercados_prioritarios'] = ['gols', 'cantos', 'resultado']
-        perfil['mercados_secundarios'] = ['finalizações', 'cartões']
-        perfil['mercados_evitar'] = ['btts']  # Visitante dificilmente marca
-
-    # PERFIL 4: VISITANTE PERIGOSO (fora forte, casa vulnerável)
-    elif gols_fora_marcados >= 1.3 and gols_casa_sofridos >= 1.4:
-        perfil['tipo'] = 'VISITANTE_PERIGOSO'
-        perfil['descricao'] = '💥 VISITANTE OFENSIVO - Fora marca bem, casa sofre. Gols de ambos prováveis.'
-        perfil['mercados_prioritarios'] = ['gols', 'btts']
-        perfil['mercados_secundarios'] = ['resultado', 'finalizações', 'cartões']
-        perfil['mercados_evitar'] = []
-
-    # PERFIL 5: JOGO EQUILIBRADO (forças similares)
-    elif abs(gols_casa_marcados - gols_fora_marcados) <= 0.4:
-        perfil['tipo'] = 'EQUILIBRADO'
-        perfil['descricao'] = '⚖️ JOGO EQUILIBRADO - Forças similares. Resultado imprevisível.'
-        perfil['mercados_prioritarios'] = ['gols', 'resultado']
-        perfil['mercados_secundarios'] = ['btts', 'finalizações', 'cartões']
-        perfil['mercados_evitar'] = []
-
-    # PERFIL 6: JOGO COM MUITOS CARTÕES (times violentos)
-    elif cartoes_casa >= 3.0 and cartoes_fora >= 2.5:
-        perfil['tipo'] = 'JOGO_QUENTE'
-        perfil['descricao'] = '🔥 JOGO QUENTE - Muita intensidade física. Cartões esperados.'
-        perfil['mercados_prioritarios'] = ['cartoes']
-        perfil['mercados_secundarios'] = ['gols', 'resultado', 'finalizações']
-        perfil['mercados_evitar'] = []
-
-    # PERFIL PADRÃO (se não se encaixa em nenhum)
-    else:
-        perfil['tipo'] = 'PADRAO'
-        perfil['descricao'] = '⚽ JOGO PADRÃO - Análise numérica sem padrão claro.'
-        perfil['mercados_prioritarios'] = ['gols']
-        perfil['mercados_secundarios'] = ['resultado', 'btts', 'finalizações', 'cartões']
-        perfil['mercados_evitar'] = []
-
-    return perfil
-
-
-def filtrar_mercados_por_contexto(analises_brutas, stats_casa, stats_fora, time_casa_id=None, time_fora_id=None):
-    """
-    Filtra os mercados sugeridos baseado no CONTEXTO da partida.
-    NÃO força múltiplos mercados só porque os números batem.
-
-    Args:
-        analises_brutas: Lista de análises geradas por todos os analyzers
-        stats_casa, stats_fora: Estatísticas dos times
-        time_casa_id, time_fora_id: IDs dos times (opcional)
-
-    Returns:
-        Lista filtrada de análises que fazem SENTIDO contextual
-    """
-    # 🧠 QUALITY SCORES: Avaliar qualidade técnica dos times
-    game_script = "EQUILIBRADO"  # Default script
-    if time_casa_id and time_fora_id:
-        home_quality, away_quality = get_quality_scores(time_casa_id, time_fora_id)
-        print(f"🧠 CONTEXT_ANALYZER - Quality Score - Home: {home_quality} | Away: {away_quality}")
-        
-        # --- NEW: Game Script Logic ---
-        quality_difference = abs(home_quality - away_quality)
-        
-        if quality_difference > 20:  # Threshold for significant difference
-            if home_quality > away_quality:
-                game_script = "DOMINIO_CASA"
-            else:
-                game_script = "DOMINIO_VISITANTE"
-        elif quality_difference > 10:  # Threshold for moderate difference
-            if home_quality > away_quality:
-                game_script = "FAVORITISMO_CASA"
-            else:
-                game_script = "FAVORITISMO_VISITANTE"
-        
-        print(f"📜 ROTEIRO DE JOGO - Quality Score: {game_script} (Diff: {quality_difference})")
-        # -----------------------------
-    
-    perfil = definir_perfil_partida(stats_casa, stats_fora)
-
-    analises_filtradas = []
-
-    for analise in analises_brutas:
-        if not analise:
-            continue
-
-        mercado = analise['mercado'].lower()
-
-        # Verificar se o mercado está na lista de evitar
-        if any(m in mercado for m in perfil['mercados_evitar']):
-            print(f"  ⚠️ CONTEXTO: Mercado '{analise['mercado']}' NÃO FAZ SENTIDO para perfil {perfil['tipo']}. DESCARTADO!")
-            continue
-
-        # Priorizar mercados principais e secundários
-        if any(m in mercado for m in perfil['mercados_prioritarios']):
-            analises_filtradas.append(analise)
-            print(f"  ✅ CONTEXTO: Mercado '{analise['mercado']}' FAZ SENTIDO para perfil {perfil['tipo']} (PRIORITÁRIO)")
-        elif any(m in mercado for m in perfil['mercados_secundarios']):
-            analises_filtradas.append(analise)
-            print(f"  ✅ CONTEXTO: Mercado '{analise['mercado']}' FAZ SENTIDO para perfil {perfil['tipo']} (SECUNDÁRIO)")
-        elif not perfil['mercados_prioritarios'] and not perfil['mercados_secundarios']:
-            # Se não há filtros específicos, aceita tudo
-            analises_filtradas.append(analise)
-
-    # LOG do perfil identificado
-    print(f"\n📊 PERFIL DA PARTIDA: {perfil['tipo']}")
-    print(f"   {perfil['descricao']}")
-    print(f"   Mercados prioritários: {perfil['mercados_prioritarios']}")
-    print(f"   Mercados secundários: {perfil['mercados_secundarios']}")
-    print(f"   Mercados a evitar: {perfil['mercados_evitar']}")
-    print(f"   Análises aceitas: {len(analises_filtradas)}/{len([a for a in analises_brutas if a])}\n")
-
-    return analises_filtradas, perfil, game_script
-
-
-# DEPRECATED: Funções obsoletas removidas - agora usa confidence_calculator.py
-# verificar_veto_mercado() -> Veto logic integrado em calculate_final_confidence()
-# ajustar_confianca_por_script() -> Script modifiers integrados em apply_tactical_script_modifier()
-# definir_perfil_partida() -> Ainda em uso mas pode ser simplificado
-# filtrar_mercados_por_contexto() -> Ainda em uso mas pode ser simplificado
+# ========================================
+# PHOENIX V3.0 - DEPRECATED FUNCTIONS PURGED
+# ========================================
+# As seguintes funções foram DELETADAS durante a refatoração V3.0:
+#
+# 1. get_quality_scores() -> Deprecada, use calculate_dynamic_qsc()
+# 2. definir_perfil_partida() -> Removida, lógica de perfil movida para master_analyzer
+# 3. filtrar_mercados_por_contexto() -> Removida, filtragem agora é responsabilidade do dossier_formatter
+# 4. ajustar_confianca_por_script() -> Integrado em confidence_calculator.apply_tactical_script_modifier()
+# 5. verificar_veto_mercado() -> Integrado em confidence_calculator.calculate_final_confidence()
+#
+# ARQUIVO SIMPLIFICADO: context_analyzer.py agora contém APENAS funções de análise contextual:
+# - calculate_dynamic_qsc()
+# - analisar_compatibilidade_ofensiva_defensiva()
+# - analisar_importancia_jogo()
+# - analisar_estilo_jogo()
+# - gerar_analise_contextual_completa()
+# ========================================
