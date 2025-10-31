@@ -1453,6 +1453,48 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=reply_markup
     )
 
+async def cache_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Comando /cache_stats - Mostra estatísticas do cache em tempo real"""
+    user_id = update.effective_user.id
+    
+    if not check_rate_limit(user_id):
+        await update.message.reply_text(
+            "⚠️ <b>Limite de Requisições Excedido</b>\n\n"
+            "Você está enviando comandos muito rapidamente.\n"
+            f"Por favor, aguarde alguns segundos antes de tentar novamente.",
+            parse_mode='HTML'
+        )
+        return
+    
+    # Obter estatísticas do cache em memória
+    stats = cache_manager.get_stats()
+    
+    # Verificar se há mudanças pendentes de salvamento
+    is_dirty = cache_manager._is_dirty
+    
+    # Verificar tamanho do arquivo no disco
+    import os
+    disk_size = 0
+    if os.path.exists(cache_manager.CACHE_FILE):
+        disk_size = os.path.getsize(cache_manager.CACHE_FILE)
+        disk_size_mb = disk_size / (1024 * 1024)
+    else:
+        disk_size_mb = 0
+    
+    await update.message.reply_text(
+        f"📊 <b>Estatísticas do Cache</b>\n\n"
+        f"💾 <b>Memória RAM (estado atual):</b>\n"
+        f"├─ Total de itens: <b>{stats['total']}</b>\n"
+        f"├─ Itens válidos: <b>{stats['validos']}</b>\n"
+        f"└─ Itens expirados: <b>{stats['expirados']}</b>\n\n"
+        f"💿 <b>Disco (cache.json):</b>\n"
+        f"└─ Tamanho: <b>{disk_size_mb:.2f} MB</b>\n\n"
+        f"🔄 <b>Status de Salvamento:</b>\n"
+        f"└─ Mudanças pendentes: <b>{'SIM ⏳' if is_dirty else 'NÃO ✅'}</b>\n\n"
+        f"ℹ️ <i>O cache é salvo automaticamente a cada 5 minutos.</i>",
+        parse_mode='HTML'
+    )
+
 async def limpar_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     
@@ -1464,6 +1506,17 @@ async def limpar_cache_command(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode='HTML'
         )
         return
+    
+    # Mostrar estatísticas ANTES de limpar
+    stats = cache_manager.get_stats()
+    await update.message.reply_text(
+        f"📊 <b>Estado Atual do Cache (EM MEMÓRIA):</b>\n\n"
+        f"📦 Total de itens: <b>{stats['total']}</b>\n"
+        f"✅ Itens válidos: <b>{stats['validos']}</b>\n"
+        f"⏰ Itens expirados: <b>{stats['expirados']}</b>\n\n"
+        f"🗑️ Limpando cache...",
+        parse_mode='HTML'
+    )
     
     cache_manager.clear()
     await update.message.reply_text("✅ Memória de análise (cache) foi limpa com sucesso!")
@@ -2767,6 +2820,7 @@ def main() -> None:
     setup_signal_handlers(application)
     
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("cache_stats", cache_stats_command))
     application.add_handler(CommandHandler("limpar_cache", limpar_cache_command))
     application.add_handler(CommandHandler("getlog", getlog_command))
     application.add_handler(CommandHandler("debug_confianca", debug_confianca_command))
