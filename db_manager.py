@@ -59,6 +59,84 @@ class DatabaseManager:
             if conn:
                 self.pool.putconn(conn)
     
+    def initialize_database(self):
+        """
+        Inicializa o schema do banco de dados, criando todas as tabelas necessárias.
+        Executa CREATE TABLE IF NOT EXISTS para garantir que o schema está completo.
+        """
+        if not self.enabled:
+            print("⚠️ Database não habilitado, pulando inicialização")
+            return False
+        
+        schema_sql = """
+        -- Tabela principal de análises de jogos (cache)
+        CREATE TABLE IF NOT EXISTS analises_jogos (
+            id SERIAL PRIMARY KEY,
+            fixture_id INTEGER UNIQUE NOT NULL,
+            data_jogo TIMESTAMP WITH TIME ZONE NOT NULL,
+            liga VARCHAR(255),
+            time_casa VARCHAR(255),
+            time_fora VARCHAR(255),
+            stats_casa JSONB,
+            stats_fora JSONB,
+            classificacao JSONB,
+            analise_gols JSONB,
+            analise_cantos JSONB,
+            analise_btts JSONB,
+            analise_resultado JSONB,
+            analise_cartoes JSONB,
+            analise_contexto JSONB,
+            palpites_totais INTEGER DEFAULT 0,
+            confianca_media DECIMAL(3,1) DEFAULT 0,
+            data_analise TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+
+        -- Índices para performance
+        CREATE INDEX IF NOT EXISTS idx_analises_jogos_fixture_id ON analises_jogos(fixture_id);
+        CREATE INDEX IF NOT EXISTS idx_analises_jogos_data_jogo ON analises_jogos(data_jogo);
+        CREATE INDEX IF NOT EXISTS idx_analises_jogos_atualizado_em ON analises_jogos(atualizado_em);
+
+        -- Nova tabela para sistema de fila de análises diárias
+        CREATE TABLE IF NOT EXISTS daily_analyses (
+            id SERIAL PRIMARY KEY,
+            fixture_id INTEGER NOT NULL,
+            analysis_type VARCHAR(50) NOT NULL,
+            dossier_json TEXT NOT NULL,
+            user_id BIGINT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            CONSTRAINT daily_analyses_unique UNIQUE (fixture_id, analysis_type, user_id)
+        );
+
+        -- Índices para performance na tabela daily_analyses
+        CREATE INDEX IF NOT EXISTS idx_daily_analyses_user_type ON daily_analyses(user_id, analysis_type);
+        CREATE INDEX IF NOT EXISTS idx_daily_analyses_created_at ON daily_analyses(created_at);
+        CREATE INDEX IF NOT EXISTS idx_daily_analyses_fixture_id ON daily_analyses(fixture_id);
+        """
+        
+        try:
+            with self._get_connection() as conn:
+                if not conn:
+                    print("❌ Não foi possível obter conexão para inicializar banco")
+                    return False
+                
+                cursor = conn.cursor()
+                
+                # Executar todo o schema
+                cursor.execute(schema_sql)
+                
+                conn.commit()
+                cursor.close()
+                
+                print("✅ Database schema inicializado com sucesso!")
+                print("   📋 Tabelas criadas: analises_jogos, daily_analyses")
+                return True
+                
+        except Exception as e:
+            print(f"❌ Erro ao inicializar database schema: {e}")
+            return False
+    
     def close_pool(self):
         """Fecha o connection pool ao desligar a aplicação"""
         if self.pool:
