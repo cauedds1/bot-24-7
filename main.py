@@ -29,7 +29,7 @@ from analysts.justification_generator import generate_persuasive_justification
 
 load_dotenv()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
 
 LIGAS_POR_PAGINA = 10
 
@@ -556,7 +556,9 @@ def gerar_analise_completa_todos_mercados(jogo):
             rating, emoji = get_value_rating(value_score)
             
             mensagem += f"{item['mercado_emoji']} <b>#{idx} - {item['mercado_nome']}</b>\n"
-            mensagem += f"  📌 <b>{p['tipo']}</b> ({p.get('periodo', 'FT')}) <b>@{p['odd']}</b>\n"
+            
+            odd_str = f" <b>@{p['odd']}</b>" if p.get('odd') and p.get('odd') > 0 else " <i>(Oportunidade Tática)</i>"
+            mensagem += f"  📌 <b>{p['tipo']}</b> ({p.get('periodo', 'FT')}){odd_str}\n"
             mensagem += f"  💎 <b>Value:</b> {emoji} {value_pct} ({rating})\n"
             mensagem += f"  🎯 <b>Probabilidade:</b> {item['bot_probability']:.0%} | <b>Confiança:</b> {p.get('confianca', 'N/A')}/10\n\n"
         
@@ -574,7 +576,8 @@ def gerar_analise_completa_todos_mercados(jogo):
             value_pct = format_value_percentage(value_score)
             rating, emoji = get_value_rating(value_score)
             
-            mensagem += f"{item['mercado_emoji']} <b>{item['mercado_nome']}:</b> {p['tipo']} ({p.get('periodo', 'FT')}) @{p['odd']} - {emoji} {value_pct}\n"
+            odd_str = f" @{p['odd']}" if p.get('odd') and p.get('odd') > 0 else " (Tática)"
+            mensagem += f"{item['mercado_emoji']} <b>{item['mercado_nome']}:</b> {p['tipo']} ({p.get('periodo', 'FT')}){odd_str} - {emoji} {value_pct}\n"
         
         mensagem += "\n"
     
@@ -985,7 +988,8 @@ def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
         # Formatar tipo do palpite
         tipo_formatado = palpite['tipo']
 
-        mensagem += f"<b>{idx}.</b> <b>{tipo_formatado} {palpite['mercado']}{time_str}{periodo_str}</b> @{palpite['odd']} "
+        odd_str = f" @{palpite['odd']}" if palpite.get('odd') and palpite.get('odd') > 0 else ""
+        mensagem += f"<b>{idx}.</b> <b>{tipo_formatado} {palpite['mercado']}{time_str}{periodo_str}</b>{odd_str} "
         mensagem += f"<i>(Confiança: {palpite['confianca']}/10)</i>\n"
 
     # ========== JUSTIFICATIVA DETALHADA ==========
@@ -1018,7 +1022,8 @@ def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
             tipo_formatado = palpite['tipo']
 
             confianca_emoji = "🟢" if palpite['confianca'] >= 7.5 else "🟡" if palpite['confianca'] >= 6.5 else "🔵"
-            mensagem += f"{confianca_emoji} <b>{tipo_formatado} {palpite['mercado']}{time_str}{periodo_str}</b> @{palpite['odd']} <i>({palpite['confianca']}/10)</i>\n"
+            odd_str = f" @{palpite['odd']}" if palpite.get('odd') and palpite.get('odd') > 0 else ""
+            mensagem += f"{confianca_emoji} <b>{tipo_formatado} {palpite['mercado']}{time_str}{periodo_str}</b>{odd_str} <i>({palpite['confianca']}/10)</i>\n"
 
     # Indicador de cache otimizado
     if usar_cache_otimizado:
@@ -1954,7 +1959,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         mensagem += f"⚽ <b>{aposta['time_casa']}</b> vs <b>{aposta['time_fora']}</b>\n"
         mensagem += f"🕐 {horario} (Brasília)\n\n"
         mensagem += f"🎯 <b>{palpite['tipo']} {mercado}{periodo_str}</b>\n"
-        mensagem += f"📊 Odd: <b>@{palpite['odd']}</b>\n"
+        
+        if palpite.get('odd') and palpite.get('odd') > 0:
+            mensagem += f"📊 Odd: <b>@{palpite['odd']}</b>\n"
+        
         mensagem += f"💎 Confiança: <b>{palpite['confianca']}/10</b>\n"
 
         keyboard = [
@@ -2008,7 +2016,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             periodo_str = f" ({palpite.get('periodo', 'FT')})" if palpite.get('periodo') != 'FT' else ""
 
             mensagem += f"<b>{idx}.</b> {item['time_casa']} vs {item['time_fora']}\n"
-            mensagem += f"   🎯 <b>{mercado}: {palpite['tipo']}{periodo_str}</b> @{palpite['odd']}\n"
+            
+            odd_str = f" @{palpite['odd']}" if palpite.get('odd') and palpite.get('odd') > 0 else ""
+            mensagem += f"   🎯 <b>{mercado}: {palpite['tipo']}{periodo_str}</b>{odd_str}\n"
             mensagem += f"   🕐 {horario} | 💎 {palpite['confianca']}/10\n\n"
 
         mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2066,7 +2076,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             periodo_str = f" ({palpite.get('periodo', 'FT')})" if palpite.get('periodo') != 'FT' else ""
 
             mensagem += f"<b>{idx}.</b> {item['time_casa']} vs {item['time_fora']}\n"
-            mensagem += f"   🎯 <b>{mercado}: {palpite['tipo']}{periodo_str}</b> @{palpite['odd']}\n"
+            
+            odd_str = f" @{palpite['odd']}" if palpite.get('odd') and palpite.get('odd') > 0 else ""
+            mensagem += f"   🎯 <b>{mercado}: {palpite['tipo']}{periodo_str}</b>{odd_str}\n"
             mensagem += f"   🕐 {horario} | 💎 {palpite['confianca']}/10\n\n"
 
         mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"

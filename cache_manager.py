@@ -17,18 +17,19 @@ _cache_lock = threading.RLock()  # RLock (reentrant) para evitar deadlocks
 CACHE_FILE = "cache.json"
 
 # Configurações inteligentes de expiração por tipo de dado
-# 🚀 CACHE ULTRA-AGRESSIVO: Todos com 24 horas para máxima performance
+# ⚡ CACHE CALIBRADO: TTLs otimizados por sensibilidade temporal
 CACHE_EXPIRATION = {
-    'jogos_': 1440,              # 24 HORAS - jogos do dia
-    'odds_': 1440,               # 24 HORAS - odds
-    'stats_': 1440,              # 24 HORAS - estatísticas de times
-    'classificacao_': 1440,      # 24 HORAS - classificação
-    'analise_jogo_': 1440,       # 24 HORAS - análise completa de jogo
-    'fixture_stats_': 1440,      # 24 HORAS - estatísticas de fixture
-    'ultimos_jogos_': 1440,      # 24 HORAS - últimos jogos do time
-    'ligas_': 1440,              # 24 HORAS - lista de ligas disponíveis
-    'h2h_': 1440,                # 24 HORAS - confrontos diretos (H2H)
-    'default': 1440              # 24 HORAS - padrão
+    'jogos_': 240,               # 4 HORAS - jogos do dia
+    'odds_': 60,                 # 1 HORA - odds (dados sensíveis ao tempo)
+    'stats_': 360,               # 6 HORAS - estatísticas de times (dados recentes)
+    'classificacao_': 720,       # 12 HORAS - classificação (atualização moderada)
+    'analise_jogo_': 120,        # 2 HORAS - análise completa de jogo
+    'fixture_stats_': 360,       # 6 HORAS - estatísticas de fixture (dados recentes)
+    'ultimos_jogos_': 360,       # 6 HORAS - últimos jogos do time (dados recentes)
+    'ligas_': 1440,              # 24 HORAS - lista de ligas disponíveis (dados estáveis)
+    'h2h_': 10080,               # 7 DIAS - confrontos diretos históricos (dados históricos)
+    'current_season_': 720,      # 12 HORAS - temporada atual da liga
+    'default': 240               # 4 HORAS - padrão
 }
 
 def get_expiration_for_key(key):

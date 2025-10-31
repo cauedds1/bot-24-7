@@ -67,11 +67,17 @@ def _justificar_gols(tipo, value_score, game_script, expectativa_gols, quality_h
         if expectativa_gols:
             justificativa += f"Nossa projeção indica <b>{expectativa_gols:.1f} gols</b> no jogo. "
         
-        justificativa += (
-            f"\n\n💡 <b>Oportunidade de Valor:</b> A odd de <b>@{odd:.2f}</b> para {tipo} "
-            f"implica uma probabilidade menor do que nossa análise sugere, "
-            f"gerando um valor positivo de <b>{value_pct}</b>."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"\n\n💡 <b>Oportunidade de Valor:</b> A odd de <b>@{odd:.2f}</b> para {tipo} "
+                f"implica uma probabilidade menor do que nossa análise sugere, "
+                f"gerando um valor positivo de <b>{value_pct}</b>."
+            )
+        else:
+            justificativa += (
+                f"\n\n💡 <b>Oportunidade de Valor:</b> Nossa análise sugere "
+                f"um valor positivo de <b>{value_pct}</b> para {tipo}."
+            )
         
         return justificativa
     
@@ -87,10 +93,16 @@ def _justificar_gols(tipo, value_score, game_script, expectativa_gols, quality_h
         if expectativa_gols:
             justificativa += f"Expectativa de <b>{expectativa_gols:.1f} gols</b> baseada no confronto ofensivo/defensivo. "
         
-        justificativa += (
-            f"\n\n💰 <b>Valor Matemático:</b> O mercado subprecificou esta linha. "
-            f"A odd @{odd:.2f} oferece <b>{value_pct}</b> de valor sobre nossa estimativa."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"\n\n💰 <b>Valor Matemático:</b> O mercado subprecificou esta linha. "
+                f"A odd @{odd:.2f} oferece <b>{value_pct}</b> de valor sobre nossa estimativa."
+            )
+        else:
+            justificativa += (
+                f"\n\n💰 <b>Valor Matemático:</b> Nossa análise identifica "
+                f"<b>{value_pct}</b> de valor sobre a estimativa de mercado."
+            )
         
         return justificativa
     
@@ -102,20 +114,28 @@ def _justificar_gols(tipo, value_score, game_script, expectativa_gols, quality_h
             f"A análise se baseia no confronto estatístico entre <b>ataque e defesa</b>.\n\n"
         )
         
-        justificativa += (
-            f"📈 <b>Projeção:</b> Com <b>{expectativa_gols:.1f} gols</b> esperados, "
-            f"a linha {tipo} a <b>@{odd:.2f}</b> apresenta valor matemático interessante. "
-            f"O mercado parece ter subestimado o potencial ofensivo (<b>{value_pct}</b> de valor)."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"📈 <b>Projeção:</b> Com <b>{expectativa_gols:.1f} gols</b> esperados, "
+                f"a linha {tipo} a <b>@{odd:.2f}</b> apresenta valor matemático interessante. "
+                f"O mercado parece ter subestimado o potencial ofensivo (<b>{value_pct}</b> de valor)."
+            )
+        else:
+            justificativa += (
+                f"📈 <b>Projeção:</b> Com <b>{expectativa_gols:.1f} gols</b> esperados, "
+                f"a linha {tipo} apresenta valor matemático interessante. "
+                f"Nossa análise identifica <b>{value_pct}</b> de valor positivo."
+            )
         
         return justificativa
     
     # --- CENÁRIO 4: EQUILIBRADO + UNDER (Defesas Fortes) ---
     elif game_script == "EQUILIBRADO" and "Under" in tipo and expectativa_gols:
+        odd_text = f" a <b>@{odd:.2f}</b>" if odd and odd > 0 else ""
         justificativa = (
             f"🛡️ <b>Confronto Equilibrado:</b> O ponto-chave é a <b>força defensiva</b> de ambas as equipes. "
             f"Com expectativa de apenas <b>{expectativa_gols:.1f} gols</b>, "
-            f"a linha {tipo} a <b>@{odd:.2f}</b> tem valor matemático.\n\n"
+            f"a linha {tipo}{odd_text} tem valor matemático.\n\n"
         )
         
         justificativa += (
@@ -135,10 +155,16 @@ def _justificar_gols(tipo, value_score, game_script, expectativa_gols, quality_h
             f"baseada no histórico recente e tendência <b>{trend}</b> das equipes.\n\n"
         )
         
-        justificativa += (
-            f"💰 <b>Valor Identificado:</b> A odd @{odd:.2f} oferece <b>{value_pct}</b> "
-            f"de valor sobre nossa projeção matemática."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"💰 <b>Valor Identificado:</b> A odd @{odd:.2f} oferece <b>{value_pct}</b> "
+                f"de valor sobre nossa projeção matemática."
+            )
+        else:
+            justificativa += (
+                f"💰 <b>Valor Identificado:</b> Nossa análise oferece <b>{value_pct}</b> "
+                f"de valor sobre a projeção matemática."
+            )
         
         return justificativa
     
@@ -166,10 +192,16 @@ def _justificar_cantos(tipo, value_score, game_script, **kwargs):
         if projecao_cantos:
             justificativa += f"📈 Nossa projeção: <b>{projecao_cantos:.1f} cantos</b>. "
         
-        justificativa += (
-            f"A odd @{odd:.2f} para {tipo} oferece <b>{value_pct}</b> "
-            f"de valor, pois o mercado subestimou o volume de ataques esperado."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"A odd @{odd:.2f} para {tipo} oferece <b>{value_pct}</b> "
+                f"de valor, pois o mercado subestimou o volume de ataques esperado."
+            )
+        else:
+            justificativa += (
+                f"Nossa análise identifica <b>{value_pct}</b> de valor, "
+                f"pois o mercado subestimou o volume de ataques esperado."
+            )
         
         return justificativa
     
@@ -182,10 +214,16 @@ def _justificar_cantos(tipo, value_score, game_script, **kwargs):
         if projecao_cantos:
             justificativa += f"Nossa projeção de <b>{projecao_cantos:.1f} cantos</b> "
         
-        justificativa += (
-            f"sugere que {tipo} a <b>@{odd:.2f}</b> está mal precificado "
-            f"(<b>{value_pct}</b> de valor positivo)."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"sugere que {tipo} a <b>@{odd:.2f}</b> está mal precificado "
+                f"(<b>{value_pct}</b> de valor positivo)."
+            )
+        else:
+            justificativa += (
+                f"sugere que {tipo} está mal precificado "
+                f"(<b>{value_pct}</b> de valor positivo)."
+            )
         
         return justificativa
     
@@ -207,10 +245,16 @@ def _justificar_cartoes(tipo, value_score, game_script, **kwargs):
             f"do confronto. Estatisticamente, clássicos têm <b>50% mais cartões</b> que jogos normais.\n\n"
         )
         
-        justificativa += (
-            f"💡 A linha {tipo} a <b>@{odd:.2f}</b> não precificou adequadamente este fator, "
-            f"gerando <b>{value_pct}</b> de valor."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"💡 A linha {tipo} a <b>@{odd:.2f}</b> não precificou adequadamente este fator, "
+                f"gerando <b>{value_pct}</b> de valor."
+            )
+        else:
+            justificativa += (
+                f"💡 A linha {tipo} não precificou adequadamente este fator, "
+                f"gerando <b>{value_pct}</b> de valor."
+            )
         
         return justificativa
     
@@ -220,10 +264,16 @@ def _justificar_cartoes(tipo, value_score, game_script, **kwargs):
             f"de muitas faltas. Expectativa de <b>arbitragem rigorosa</b>.\n\n"
         )
         
-        justificativa += (
-            f"📊 Nossa análise indica que {tipo} a <b>@{odd:.2f}</b> "
-            f"oferece <b>{value_pct}</b> de valor matemático."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"📊 Nossa análise indica que {tipo} a <b>@{odd:.2f}</b> "
+                f"oferece <b>{value_pct}</b> de valor matemático."
+            )
+        else:
+            justificativa += (
+                f"📊 Nossa análise indica que {tipo} "
+                f"oferece <b>{value_pct}</b> de valor matemático."
+            )
         
         return justificativa
     
@@ -247,10 +297,16 @@ def _justificar_btts(tipo, value_score, expectativa_gols, **kwargs):
         if expectativa_gols:
             justificativa += f"Com expectativa de <b>{expectativa_gols:.1f} gols</b>, "
         
-        justificativa += (
-            f"BTTS Sim a <b>@{odd:.2f}</b> oferece <b>{value_pct}</b> "
-            f"de valor, já que ambos têm alto poder ofensivo."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"BTTS Sim a <b>@{odd:.2f}</b> oferece <b>{value_pct}</b> "
+                f"de valor, já que ambos têm alto poder ofensivo."
+            )
+        else:
+            justificativa += (
+                f"BTTS Sim oferece <b>{value_pct}</b> "
+                f"de valor, já que ambos têm alto poder ofensivo."
+            )
         
         return justificativa
     
@@ -260,10 +316,15 @@ def _justificar_btts(tipo, value_score, expectativa_gols, **kwargs):
             f"reduzindo a probabilidade de ambos marcarem.\n\n"
         )
         
-        justificativa += (
-            f"💰 A odd @{odd:.2f} para BTTS Não está subvalorizada, "
-            f"oferecendo <b>{value_pct}</b> de valor matemático."
-        )
+        if odd and odd > 0:
+            justificativa += (
+                f"💰 A odd @{odd:.2f} para BTTS Não está subvalorizada, "
+                f"oferecendo <b>{value_pct}</b> de valor matemático."
+            )
+        else:
+            justificativa += (
+                f"💰 BTTS Não oferece <b>{value_pct}</b> de valor matemático."
+            )
         
         return justificativa
     
@@ -288,9 +349,15 @@ def _justificar_generica(tipo, value_score, odd):
         f"uma <b>{intensidade} oportunidade de valor</b> nesta linha.\n\n"
     )
     
-    justificativa += (
-        f"💰 A odd @{odd:.2f} para {tipo} oferece <b>{value_pct}</b> "
-        f"de valor positivo sobre nossa estimativa de probabilidade."
-    )
+    if odd and odd > 0:
+        justificativa += (
+            f"💰 A odd @{odd:.2f} para {tipo} oferece <b>{value_pct}</b> "
+            f"de valor positivo sobre nossa estimativa de probabilidade."
+        )
+    else:
+        justificativa += (
+            f"💰 A linha {tipo} oferece <b>{value_pct}</b> "
+            f"de valor positivo sobre nossa estimativa de probabilidade."
+        )
     
     return justificativa

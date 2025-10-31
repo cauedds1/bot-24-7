@@ -440,6 +440,54 @@ NOMES_LIGAS_PT = {
     202: ("🇹🇳 Ligue Professionnelle 1", "Tunísia"),
 }
 
+def get_current_season(league_id):
+    """
+    Determina dinamicamente a temporada atual de uma liga usando a API.
+    
+    Args:
+        league_id: ID da liga
+        
+    Returns:
+        str: Ano da temporada atual (ex: "2025")
+    """
+    cache_key = f"current_season_{league_id}"
+    
+    if cached_season := cache_manager.get(cache_key):
+        return str(cached_season)
+    
+    try:
+        response = requests.get(
+            f"{API_URL}leagues",
+            headers=HEADERS,
+            params={"id": league_id, "current": "true"},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('response') and len(data['response']) > 0:
+                league_data = data['response'][0]
+                if 'seasons' in league_data and len(league_data['seasons']) > 0:
+                    current_season = league_data['seasons'][0]
+                    season_year = current_season.get('year')
+                    
+                    if season_year:
+                        cache_manager.set(cache_key, season_year)
+                        return str(season_year)
+    
+    except Exception as e:
+        print(f"⚠️ Erro ao buscar temporada dinâmica para liga {league_id}: {e}")
+    
+    brasilia_tz = ZoneInfo("America/Sao_Paulo")
+    agora = datetime.now(brasilia_tz)
+    ano_atual = agora.year
+    
+    fallback_season = str(ano_atual - 1)
+    print(f"ℹ️ Usando fallback de temporada para liga {league_id}: {fallback_season}")
+    cache_manager.set(cache_key, fallback_season)
+    
+    return fallback_season
+
 def buscar_jogos_do_dia():
     # Obter hora atual no horário de Brasília
     brasilia_tz = ZoneInfo("America/Sao_Paulo")
@@ -535,15 +583,7 @@ def buscar_classificacao_liga(id_liga: int):
     cache_key = f"classificacao_{id_liga}"
     if cached_data := cache_manager.get(cache_key): return cached_data
     
-    # Determinar temporada atual automaticamente (horário de Brasília)
-    brasilia_tz = ZoneInfo("America/Sao_Paulo")
-    agora = datetime.now(brasilia_tz)
-    mes_atual = agora.month
-    ano_atual = agora.year
-    
-    # Se estamos entre janeiro-junho, usar ano anterior (maioria das ligas termina em maio/junho)
-    # Se estamos entre julho-dezembro, usar ano atual (novas temporadas começam em agosto)
-    season = str(ano_atual) if mes_atual >= 7 else str(ano_atual - 1)
+    season = get_current_season(id_liga)
     
     params = {"league": str(id_liga), "season": season}
     try:
@@ -566,15 +606,7 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
     cache_key = f"stats_{time_id}_liga_{id_liga}"
     if cached_data := cache_manager.get(cache_key): return cached_data
 
-    # Determinar temporada atual automaticamente (horário de Brasília)
-    brasilia_tz = ZoneInfo("America/Sao_Paulo")
-    agora = datetime.now(brasilia_tz)
-    mes_atual = agora.month
-    ano_atual = agora.year
-
-    # Se estamos entre janeiro-junho, usar ano anterior (maioria das ligas termina em maio/junho)
-    # Se estamos entre julho-dezembro, usar ano atual (novas temporadas começam em agosto)
-    season = str(ano_atual) if mes_atual >= 7 else str(ano_atual - 1)
+    season = get_current_season(id_liga)
 
     params = {"team": str(time_id), "league": str(id_liga), "season": season}
     try:
