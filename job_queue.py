@@ -10,7 +10,8 @@ from db_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
-analysis_queue = asyncio.Queue()
+MAX_QUEUE_SIZE = 1000
+analysis_queue = asyncio.Queue(maxsize=MAX_QUEUE_SIZE)
 
 job_status = {}
 
@@ -28,11 +29,28 @@ class AnalysisJob:
         self.completed_at = None
 
 async def add_analysis_job(user_id: int, analysis_type: str, league_id: Optional[int] = None, fixture_id: Optional[int] = None):
+    """
+    Adiciona um job de análise à fila com proteção contra sobrecarga.
+    
+    Returns:
+        str: job_id se adicionado com sucesso
+        None: se a fila estiver cheia
+    """
+    if analysis_queue.qsize() >= MAX_QUEUE_SIZE:
+        logger.warning(f"⚠️ Fila de análises CHEIA ({MAX_QUEUE_SIZE}/{MAX_QUEUE_SIZE}). Job rejeitado para user {user_id}")
+        return None
+    
     job = AnalysisJob(user_id, analysis_type, league_id, fixture_id)
     job_status[job.job_id] = job
-    await analysis_queue.put(job)
-    logger.info(f"✅ Job {job.job_id} adicionado à fila. Tipo: {analysis_type}")
-    return job.job_id
+    
+    try:
+        await asyncio.wait_for(analysis_queue.put(job), timeout=1.0)
+        logger.info(f"✅ Job {job.job_id} adicionado à fila ({analysis_queue.qsize()}/{MAX_QUEUE_SIZE}). Tipo: {analysis_type}")
+        return job.job_id
+    except asyncio.TimeoutError:
+        logger.error(f"❌ Timeout ao adicionar job à fila. Fila pode estar bloqueada.")
+        del job_status[job.job_id]
+        return None
 
 def get_job_status(job_id: str) -> Optional[Dict]:
     job = job_status.get(job_id)
@@ -44,6 +62,21 @@ def get_job_status(job_id: str) -> Optional[Dict]:
             "type": job.analysis_type
         }
     return None
+
+def get_queue_stats() -> Dict:
+    """
+    Retorna estatísticas da fila de análises.
+    
+    Returns:
+        Dict com: queue_size, max_size, utilization_percent
+    """
+    current_size = analysis_queue.qsize()
+    return {
+        "queue_size": current_size,
+        "max_size": MAX_QUEUE_SIZE,
+        "utilization_percent": round((current_size / MAX_QUEUE_SIZE) * 100, 1),
+        "is_full": current_size >= MAX_QUEUE_SIZE
+    }
 
 def cleanup_old_jobs(max_age_hours: int = 24):
     """

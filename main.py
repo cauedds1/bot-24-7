@@ -3,6 +3,7 @@ import os
 import logging
 import random
 import asyncio
+import signal
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -40,6 +41,38 @@ analises_em_background = {}
 
 # Inicializar gerenciador de banco de dados
 db_manager = DatabaseManager()
+
+# Rate Limiting - Previne abuso de comandos
+user_command_timestamps = {}
+RATE_LIMIT_COMMANDS_PER_MINUTE = 10
+RATE_LIMIT_WINDOW_SECONDS = 60
+
+def check_rate_limit(user_id: int) -> bool:
+    """
+    Verifica se o usuário excedeu o rate limit de comandos.
+    
+    Rate Limit: 10 comandos por minuto por usuário.
+    
+    Returns:
+        True se dentro do limite, False se excedeu
+    """
+    now = datetime.now()
+    
+    if user_id not in user_command_timestamps:
+        user_command_timestamps[user_id] = []
+    
+    cutoff_time = now - timedelta(seconds=RATE_LIMIT_WINDOW_SECONDS)
+    user_command_timestamps[user_id] = [
+        ts for ts in user_command_timestamps[user_id]
+        if ts > cutoff_time
+    ]
+    
+    if len(user_command_timestamps[user_id]) >= RATE_LIMIT_COMMANDS_PER_MINUTE:
+        logging.warning(f"⚠️ Rate limit excedido para user {user_id}")
+        return False
+    
+    user_command_timestamps[user_id].append(now)
+    return True
 
 def get_rodada_atual(jogo):
     try:
@@ -1380,6 +1413,17 @@ async def gerar_bingo_odd_alta(odd_min, odd_max):
     return multipla_final
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    
+    if not check_rate_limit(user_id):
+        await update.message.reply_text(
+            "⚠️ <b>Limite de Requisições Excedido</b>\n\n"
+            "Você está enviando comandos muito rapidamente.\n"
+            f"Por favor, aguarde alguns segundos antes de tentar novamente. (Limite: {RATE_LIMIT_COMMANDS_PER_MINUTE} comandos/{RATE_LIMIT_WINDOW_SECONDS}s)",
+            parse_mode='HTML'
+        )
+        return
+    
     # Menu organizado em grid 2x3 + NOVOS MÓDULOS + linha de configurações
     keyboard = [
         [InlineKeyboardButton("🎯 Análise Completa", callback_data='analise_completa'), 
@@ -1406,11 +1450,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 async def limpar_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    
+    if not check_rate_limit(user_id):
+        await update.message.reply_text(
+            "⚠️ <b>Limite de Requisições Excedido</b>\n\n"
+            "Você está enviando comandos muito rapidamente.\n"
+            f"Por favor, aguarde alguns segundos antes de tentar novamente.",
+            parse_mode='HTML'
+        )
+        return
+    
     cache_manager.clear()
     await update.message.reply_text("✅ Memória de análise (cache) foi limpa com sucesso!")
 
 async def getlog_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Comando /getlog - Exporta as últimas 500 linhas do log do bot"""
+    user_id = update.effective_user.id
+    
+    if not check_rate_limit(user_id):
+        await update.message.reply_text(
+            "⚠️ <b>Limite de Requisições Excedido</b>\n\n"
+            "Você está enviando comandos muito rapidamente.\n"
+            f"Por favor, aguarde alguns segundos antes de tentar novamente.",
+            parse_mode='HTML'
+        )
+        return
+    
     import glob
     import os
     import re
@@ -1647,10 +1713,19 @@ async def analisar_e_enviar_proximo_lote(query, context: ContextTypes.DEFAULT_TY
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    user_id = query.from_user.id
+    
+    if not check_rate_limit(user_id):
+        await query.answer(
+            "⚠️ Você está enviando comandos muito rapidamente. Por favor, aguarde alguns segundos.",
+            show_alert=True
+        )
+        return
+    
     await query.answer()
     data = query.data
 
-    print(f"🔵 BUTTON HANDLER: Recebido callback_data = '{data}'")
+    logging.info(f"🔵 BUTTON HANDLER: User {user_id} - callback_data = '{data}'")
 
     if data == 'analise_completa':
         try:
@@ -1733,6 +1808,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         job_id = await job_queue.add_analysis_job(user_id, 'goals_only')
         
+        if job_id is None:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⚠️ <b>Sistema Temporariamente Sobrecarregado</b>\n\n"
+                     "Estou processando um grande número de análises no momento.\n\n"
+                     "Por favor, tente novamente em alguns minutos. 🙏",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
+            return
+        
         await asyncio.sleep(2)
         
         paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'goals_only', 0)
@@ -1763,6 +1849,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.edit_message_text(text="🚩 Adicionando análise de Escanteios à fila...\n\n⏳ Processando em background. Aguarde alguns instantes...")
         
         job_id = await job_queue.add_analysis_job(user_id, 'corners_only')
+        
+        if job_id is None:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⚠️ <b>Sistema Temporariamente Sobrecarregado</b>\n\n"
+                     "Estou processando um grande número de análises no momento.\n\n"
+                     "Por favor, tente novamente em alguns minutos. 🙏",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
+            return
         
         await asyncio.sleep(2)
         
@@ -1795,6 +1892,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         job_id = await job_queue.add_analysis_job(user_id, 'btts_only')
         
+        if job_id is None:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⚠️ <b>Sistema Temporariamente Sobrecarregado</b>\n\n"
+                     "Estou processando um grande número de análises no momento.\n\n"
+                     "Por favor, tente novamente em alguns minutos. 🙏",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
+            return
+        
         await asyncio.sleep(2)
         
         paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'btts_only', 0)
@@ -1825,6 +1933,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.edit_message_text(text="🏁 Adicionando análise de Resultado à fila...\n\n⏳ Processando em background. Aguarde alguns instantes...")
         
         job_id = await job_queue.add_analysis_job(user_id, 'result_only')
+        
+        if job_id is None:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⚠️ <b>Sistema Temporariamente Sobrecarregado</b>\n\n"
+                     "Estou processando um grande número de análises no momento.\n\n"
+                     "Por favor, tente novamente em alguns minutos. 🙏",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
+            return
         
         await asyncio.sleep(2)
         
@@ -2435,6 +2554,83 @@ async def mostrar_pagina_ligas(query, context: ContextTypes.DEFAULT_TYPE):
     mensagem = f"<b>🏆 Selecione uma Liga</b>\n\nPágina {pagina_atual + 1} de {(len(ligas) - 1) // LIGAS_POR_PAGINA + 1}"
     await query.edit_message_text(text=mensagem, reply_markup=reply_markup, parse_mode='HTML')
 
+async def startup_validation():
+    """
+    Valida secrets e conexões externas antes de iniciar o bot.
+    Previne que o bot inicie com configurações inválidas.
+    
+    Verifica:
+    - Telegram Bot Token (via get_me)
+    - API-Football Key (via chamada de teste)
+    - PostgreSQL Connection (via health check)
+    
+    Raises:
+        SystemExit: Se alguma validação falhar
+    """
+    print("🔍 Validando configurações e secrets...")
+    
+    from telegram import Bot
+    import api_client
+    
+    validation_failed = False
+    
+    if not TELEGRAM_TOKEN:
+        print("❌ FALHA CRÍTICA: TELEGRAM_BOT_TOKEN não encontrado nas variáveis de ambiente")
+        validation_failed = True
+    else:
+        try:
+            bot = Bot(token=TELEGRAM_TOKEN)
+            bot_info = await bot.get_me()
+            print(f"✅ Telegram Token válido - Bot: @{bot_info.username}")
+        except Exception as e:
+            print(f"❌ FALHA CRÍTICA: Telegram Token inválido ou erro de conexão: {e}")
+            validation_failed = True
+    
+    api_key = os.getenv("API_FOOTBALL_KEY")
+    if not api_key:
+        print("❌ FALHA CRÍTICA: API_FOOTBALL_KEY não encontrado nas variáveis de ambiente")
+        validation_failed = True
+    else:
+        try:
+            response = await api_client.api_request_with_retry(
+                "GET",
+                f"{api_client.API_URL}status",
+                params={}
+            )
+            if response.status_code == 200:
+                print(f"✅ API-Football Key válida - Conexão estabelecida")
+            else:
+                print(f"❌ FALHA CRÍTICA: API-Football retornou status {response.status_code}")
+                validation_failed = True
+        except Exception as e:
+            print(f"❌ FALHA CRÍTICA: Erro ao validar API-Football: {e}")
+            validation_failed = True
+    
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        print("⚠️ DATABASE_URL não encontrado - Cache de análises será desabilitado")
+    else:
+        try:
+            with db_manager._get_connection() as conn:
+                if conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.close()
+                    print(f"✅ PostgreSQL Connection válida - Database conectado")
+                else:
+                    print("⚠️ PostgreSQL não disponível - Cache de análises desabilitado")
+        except Exception as e:
+            print(f"❌ FALHA CRÍTICA: Erro ao validar PostgreSQL: {e}")
+            validation_failed = True
+    
+    if validation_failed:
+        print("\n❌❌❌ STARTUP VALIDATION FAILED ❌❌❌")
+        print("O bot não pode iniciar com secrets inválidos.")
+        print("Por favor, verifique suas variáveis de ambiente e tente novamente.")
+        raise SystemExit(1)
+    
+    print("✅✅✅ Todas as validações passaram! Bot pronto para iniciar.\n")
+
 async def post_init(application: Application) -> None:
     """Função executada após inicialização do bot para iniciar background workers"""
     print("🚀 Iniciando background analysis worker...")
@@ -2461,14 +2657,59 @@ async def post_shutdown(application: Application) -> None:
     db_manager.close_pool()
     print("✅ Connection pool fechado!")
 
+def setup_signal_handlers(application: Application) -> None:
+    """
+    Configura handlers para sinais do OS para garantir shutdown limpo.
+    Captura SIGINT (Ctrl+C) e SIGTERM (kill) para executar cleanup.
+    """
+    def signal_handler(signum, frame):
+        signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
+        print(f"\n🛑 Sinal {signal_name} recebido! Iniciando shutdown gracioso...")
+        
+        asyncio.create_task(graceful_shutdown(application))
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    print("✅ Signal handlers configurados (SIGINT, SIGTERM)")
+
+async def graceful_shutdown(application: Application) -> None:
+    """
+    Executa shutdown limpo quando sinais do OS são recebidos.
+    Garante que dados sejam salvos antes do encerramento.
+    """
+    try:
+        print("💾 Salvando cache antes de encerrar...")
+        await asyncio.to_thread(cache_manager.save_cache_to_disk)
+        print("✅ Cache salvo!")
+        
+        print("🔌 Fechando conexões HTTP...")
+        import api_client
+        await api_client.close_http_client()
+        print("✅ Conexões HTTP fechadas!")
+        
+        print("🗄️ Fechando connection pool do banco...")
+        db_manager.close_pool()
+        print("✅ Connection pool fechado!")
+        
+        print("🛑 Parando aplicação...")
+        await application.stop()
+        await application.shutdown()
+        print("✅ Shutdown completo!")
+        
+    except Exception as e:
+        print(f"⚠️ Erro durante shutdown: {e}")
+    finally:
+        os._exit(0)
+
 def main() -> None:
-    if not TELEGRAM_TOKEN:
-        print("ERRO CRÍTICO: O 'TELEGRAM_BOT_TOKEN' não foi encontrado.")
-        return
+    asyncio.run(startup_validation())
 
     cache_manager.load_cache_from_disk()
 
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).post_shutdown(post_shutdown).build()
+    
+    setup_signal_handlers(application)
+    
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("limpar_cache", limpar_cache_command))
     application.add_handler(CommandHandler("getlog", getlog_command))

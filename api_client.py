@@ -1,14 +1,23 @@
 # api_client.py
 import httpx
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import cache_manager
 
 import os
 from dotenv import load_dotenv
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log
+)
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 API_URL = "https://v3.football.api-sports.io/"
 HEADERS = {
@@ -22,6 +31,40 @@ http_client = httpx.AsyncClient(timeout=10.0, headers=HEADERS)
 async def close_http_client():
     """Fecha o cliente HTTP para evitar vazamento de conexões."""
     await http_client.aclose()
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException, httpx.NetworkError)),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True
+)
+async def api_request_with_retry(method: str, url: str, **kwargs):
+    """
+    Wrapper para requisições HTTP com retry automático e exponential backoff.
+    
+    Estratégia de Retry:
+    - Tentativas: até 5
+    - Backoff: 1s, 2s, 4s, 8s (exponencial)
+    - Retry em: 502 Bad Gateway, 503 Service Unavailable, Timeout, Network Errors
+    
+    Args:
+        method: Método HTTP ('GET', 'POST', etc)
+        url: URL completa da requisição
+        **kwargs: Parâmetros adicionais (params, headers, etc)
+    
+    Returns:
+        httpx.Response: Resposta da requisição
+        
+    Raises:
+        httpx.HTTPStatusError: Após todas as tentativas falharem
+    """
+    response = await http_client.request(method, url, **kwargs)
+    
+    if response.status_code in (502, 503):
+        response.raise_for_status()
+    
+    return response
 
 # ============================================
 # LIGAS DE INTERESSE - COBERTURA GLOBAL
@@ -463,7 +506,8 @@ async def get_current_season(league_id):
         return str(cached_season)
     
     try:
-        response = await http_client.get(
+        response = await api_request_with_retry(
+            "GET",
             f"{API_URL}leagues",
             params={"id": league_id, "current": "true"}
         )
@@ -544,7 +588,7 @@ async def buscar_jogos_do_dia():
                 print(f"   [DEBUG] URL: {API_URL}fixtures")
             
             try:
-                response = await http_client.get(API_URL + "fixtures", params=params)
+                response = await api_request_with_retry("GET", API_URL + "fixtures", params=params)
                 response.raise_for_status()
 
                 if data := response.json():
@@ -566,7 +610,7 @@ async def buscar_jogos_do_dia():
         for idx, liga_id in enumerate(LIGAS_DE_INTERESSE, 1):
             params = {"league": str(liga_id), "season": season, "date": amanha_brt, "status": "NS"}
             try:
-                response = await http_client.get(API_URL + "fixtures", params=params)
+                response = await api_request_with_retry("GET", API_URL + "fixtures", params=params)
                 response.raise_for_status()
 
                 if data := response.json():
@@ -594,7 +638,7 @@ async def buscar_classificacao_liga(id_liga: int):
     try:
         await asyncio.sleep(1.6)
         print(f"  🔍 Buscando classificação: Liga {id_liga}, Season {season}")
-        response = await http_client.get(API_URL + "standings", params=params)
+        response = await api_request_with_retry("GET", API_URL + "standings", params=params)
         response.raise_for_status()
         if data := response.json().get('response'):
             if data and data[0]['league']['standings']:
@@ -616,7 +660,7 @@ async def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
     params = {"team": str(time_id), "league": str(id_liga), "season": season}
     try:
         await asyncio.sleep(1.6)
-        response = await http_client.get(API_URL + "teams/statistics", params=params)
+        response = await api_request_with_retry("GET", API_URL + "teams/statistics", params=params)
         response.raise_for_status()
 
         response_data = response.json()
@@ -889,7 +933,7 @@ async def buscar_jogo_de_ida_knockout(home_team_id: int, away_team_id: int, leag
     
     try:
         await asyncio.sleep(1.6)
-        response = await http_client.get(API_URL + "fixtures/headtohead", params=params)
+        response = await api_request_with_retry("GET", API_URL + "fixtures/headtohead", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -955,7 +999,7 @@ async def buscar_h2h(time1_id: int, time2_id: int, limite: int = 5):
     params = {"h2h": f"{time1_id}-{time2_id}", "last": str(limite)}
     try:
         await asyncio.sleep(1.6)
-        response = await http_client.get(API_URL + "fixtures/headtohead", params=params)
+        response = await api_request_with_retry("GET", API_URL + "fixtures/headtohead", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -1015,7 +1059,7 @@ async def buscar_ultimos_jogos_time(time_id: int, limite: int = 5, _tentativa: i
     params = {"team": str(time_id), "season": season, "last": str(limite)}
     try:
         await asyncio.sleep(1.6)
-        response = await http_client.get(API_URL + "fixtures", params=params)
+        response = await api_request_with_retry("GET", API_URL + "fixtures", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -1169,7 +1213,7 @@ async def buscar_odds_do_jogo(id_jogo: int):
 
     try:
         await asyncio.sleep(1.6)
-        response = await http_client.get(API_URL + "odds", params=params)
+        response = await api_request_with_retry("GET", API_URL + "odds", params=params)
         response.raise_for_status()
         
         response_json = response.json()
@@ -1307,7 +1351,7 @@ async def buscar_estatisticas_jogo(fixture_id: int):
     params = {"fixture": str(fixture_id)}
     try:
         await asyncio.sleep(1.6)
-        response = await http_client.get(API_URL + "fixtures/statistics", params=params)
+        response = await api_request_with_retry("GET", API_URL + "fixtures/statistics", params=params)
         response.raise_for_status()
         
         response_json = response.json()
