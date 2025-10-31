@@ -264,13 +264,15 @@ class DatabaseManager:
         
         Args:
             fixture_id: ID do jogo
-            analysis_type: Tipo de análise ('full', 'goals_only', 'corners_only', etc.)
+            analysis_type: Tipo de análise ('full', 'goals_only', 'corners_only', etc.')
             dossier_json: JSON completo da análise (dossier)
             user_id: ID do usuário que solicitou
         """
         if not self.enabled:
             return False
         
+        conn = None
+        cursor = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -294,14 +296,16 @@ class DatabaseManager:
             ))
             
             conn.commit()
-            cursor.close()
-            conn.close()
-            
             return True
             
         except Exception as e:
             print(f"❌ Erro ao salvar daily analysis: {e}")
             return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
     
     def get_daily_analyses(self, user_id: int, analysis_type: str, offset: int = 0, limit: int = 5) -> List[Dict]:
         """
@@ -319,6 +323,8 @@ class DatabaseManager:
         if not self.enabled:
             return []
         
+        conn = None
+        cursor = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -335,14 +341,16 @@ class DatabaseManager:
             cursor.execute(query, (user_id, analysis_type, limit, offset))
             resultados = cursor.fetchall()
             
-            cursor.close()
-            conn.close()
-            
             return [dict(r) for r in resultados]
             
         except Exception as e:
             print(f"❌ Erro ao buscar daily analyses: {e}")
             return []
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
     
     def count_daily_analyses(self, user_id: int, analysis_type: str) -> int:
         """
@@ -358,6 +366,8 @@ class DatabaseManager:
         if not self.enabled:
             return 0
         
+        conn = None
+        cursor = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -372,11 +382,13 @@ class DatabaseManager:
             cursor.execute(query, (user_id, analysis_type))
             total = cursor.fetchone()[0]
             
-            cursor.close()
-            conn.close()
-            
             return total
             
         except Exception as e:
             print(f"❌ Erro ao contar daily analyses: {e}")
             return 0
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()

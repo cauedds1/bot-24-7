@@ -1728,68 +1728,128 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await mostrar_ligas_buscar_jogo(query, context)
 
     elif data == 'analise_over_gols':
-        context.user_data['filtro_mercado'] = 'gols'
-        context.user_data['filtro_tipo_linha'] = 'over_only'
-
-        await query.edit_message_text(text="Buscando jogos...")
-        jogos_encontrados = await asyncio.to_thread(buscar_jogos_do_dia)
-
-        if not jogos_encontrados:
-            await query.edit_message_text(text="Não encontrei jogos para hoje.")
-            return
-
-        random.shuffle(jogos_encontrados)
-        context.user_data['lista_de_jogos'] = jogos_encontrados
-        context.user_data['proximo_indice_jogo'] = 0
-        await analisar_e_enviar_proximo_lote(query, context)
+        user_id = query.from_user.id
+        await query.edit_message_text(text="⚽ Adicionando análise Over Gols à fila...\n\n⏳ Processando em background. Aguarde alguns instantes...")
+        
+        job_id = await job_queue.add_analysis_job(user_id, 'goals_only')
+        
+        await asyncio.sleep(2)
+        
+        paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'goals_only', 0)
+        
+        if paginated['analyses']:
+            from analysts.dossier_formatter import format_phoenix_dossier
+            
+            for analysis_row in paginated['analyses']:
+                dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
+                formatted_msg = format_phoenix_dossier(dossier)
+                await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
+            
+            keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'goals_only', paginated['total_pages'])
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"📊 Mostrando {len(paginated['analyses'])} de {paginated['total']} análises",
+                reply_markup=keyboard
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⏳ Análises sendo processadas. Use o menu para checar novamente em alguns segundos.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
 
     elif data == 'analise_escanteios':
-        context.user_data['filtro_mercado'] = 'cantos'
-        context.user_data['filtro_tipo_linha'] = None  # Permitir Over e Under
-
-        await query.edit_message_text(text="Buscando jogos...")
-        jogos_encontrados = await asyncio.to_thread(buscar_jogos_do_dia)
-
-        if not jogos_encontrados:
-            await query.edit_message_text(text="Não encontrei jogos para hoje.")
-            return
-
-        random.shuffle(jogos_encontrados)
-        context.user_data['lista_de_jogos'] = jogos_encontrados
-        context.user_data['proximo_indice_jogo'] = 0
-        await analisar_e_enviar_proximo_lote(query, context)
+        user_id = query.from_user.id
+        await query.edit_message_text(text="🚩 Adicionando análise de Escanteios à fila...\n\n⏳ Processando em background. Aguarde alguns instantes...")
+        
+        job_id = await job_queue.add_analysis_job(user_id, 'corners_only')
+        
+        await asyncio.sleep(2)
+        
+        paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'corners_only', 0)
+        
+        if paginated['analyses']:
+            from analysts.dossier_formatter import format_phoenix_dossier
+            
+            for analysis_row in paginated['analyses']:
+                dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
+                formatted_msg = format_phoenix_dossier(dossier)
+                await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
+            
+            keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'corners_only', paginated['total_pages'])
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"📊 Mostrando {len(paginated['analyses'])} de {paginated['total']} análises",
+                reply_markup=keyboard
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⏳ Análises sendo processadas. Use o menu para checar novamente em alguns segundos.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
 
     elif data == 'analise_btts':
-        context.user_data['filtro_mercado'] = 'btts'
-        context.user_data['filtro_tipo_linha'] = None
-
-        await query.edit_message_text(text="Buscando jogos...")
-        jogos_encontrados = await asyncio.to_thread(buscar_jogos_do_dia)
-
-        if not jogos_encontrados:
-            await query.edit_message_text(text="Não encontrei jogos para hoje.")
-            return
-
-        random.shuffle(jogos_encontrados)
-        context.user_data['lista_de_jogos'] = jogos_encontrados
-        context.user_data['proximo_indice_jogo'] = 0
-        await analisar_e_enviar_proximo_lote(query, context)
+        user_id = query.from_user.id
+        await query.edit_message_text(text="🎲 Adicionando análise BTTS à fila...\n\n⏳ Processando em background. Aguarde alguns instantes...")
+        
+        job_id = await job_queue.add_analysis_job(user_id, 'btts_only')
+        
+        await asyncio.sleep(2)
+        
+        paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'btts_only', 0)
+        
+        if paginated['analyses']:
+            from analysts.dossier_formatter import format_phoenix_dossier
+            
+            for analysis_row in paginated['analyses']:
+                dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
+                formatted_msg = format_phoenix_dossier(dossier)
+                await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
+            
+            keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'btts_only', paginated['total_pages'])
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"📊 Mostrando {len(paginated['analyses'])} de {paginated['total']} análises",
+                reply_markup=keyboard
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⏳ Análises sendo processadas. Use o menu para checar novamente em alguns segundos.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
 
     elif data == 'analise_resultado':
-        context.user_data['filtro_mercado'] = 'resultado'
-        context.user_data['filtro_tipo_linha'] = None
-
-        await query.edit_message_text(text="Buscando jogos...")
-        jogos_encontrados = await asyncio.to_thread(buscar_jogos_do_dia)
-
-        if not jogos_encontrados:
-            await query.edit_message_text(text="Não encontrei jogos para hoje.")
-            return
-
-        random.shuffle(jogos_encontrados)
-        context.user_data['lista_de_jogos'] = jogos_encontrados
-        context.user_data['proximo_indice_jogo'] = 0
-        await analisar_e_enviar_proximo_lote(query, context)
+        user_id = query.from_user.id
+        await query.edit_message_text(text="🏁 Adicionando análise de Resultado à fila...\n\n⏳ Processando em background. Aguarde alguns instantes...")
+        
+        job_id = await job_queue.add_analysis_job(user_id, 'result_only')
+        
+        await asyncio.sleep(2)
+        
+        paginated = pagination_helpers.get_paginated_analyses(db_manager, user_id, 'result_only', 0)
+        
+        if paginated['analyses']:
+            from analysts.dossier_formatter import format_phoenix_dossier
+            
+            for analysis_row in paginated['analyses']:
+                dossier = pagination_helpers.parse_dossier_from_analysis(analysis_row)
+                formatted_msg = format_phoenix_dossier(dossier)
+                await context.bot.send_message(chat_id=query.message.chat_id, text=formatted_msg, parse_mode='HTML')
+            
+            keyboard = pagination_helpers.create_pagination_keyboard(0, paginated['has_more'], 'result_only', paginated['total_pages'])
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"📊 Mostrando {len(paginated['analyses'])} de {paginated['total']} análises",
+                reply_markup=keyboard
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="⏳ Análises sendo processadas. Use o menu para checar novamente em alguns segundos.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Menu", callback_data="voltar_menu")]])
+            )
 
     elif data == 'buscar_jogo':
         await query.edit_message_text(text="🔍 Carregando ligas disponíveis...")

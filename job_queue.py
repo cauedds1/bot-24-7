@@ -59,9 +59,9 @@ async def background_analysis_worker(db_manager: DatabaseManager):
                 fixtures_to_analyze = [{"fixture": {"id": job.fixture_id}}]
             elif job.league_id:
                 from api_client import buscar_jogos_por_liga
-                fixtures_to_analyze = buscar_jogos_por_liga(job.league_id) or []
+                fixtures_to_analyze = await asyncio.to_thread(buscar_jogos_por_liga, job.league_id) or []
             else:
-                fixtures_to_analyze = buscar_jogos_do_dia() or []
+                fixtures_to_analyze = await asyncio.to_thread(buscar_jogos_do_dia) or []
             
             job.total_fixtures = len(fixtures_to_analyze)
             logger.info(f"📊 {job.total_fixtures} jogos para analisar")
@@ -74,11 +74,12 @@ async def background_analysis_worker(db_manager: DatabaseManager):
                     
                     logger.info(f"🔍 Analisando fixture {fixture_id}...")
                     
-                    analysis_packet = generate_match_analysis(jogo)
+                    analysis_packet = await asyncio.to_thread(generate_match_analysis, jogo)
                     
                     dossier_json = json.dumps(analysis_packet, ensure_ascii=False)
                     
-                    db_manager.save_daily_analysis(
+                    await asyncio.to_thread(
+                        db_manager.save_daily_analysis,
                         fixture_id=fixture_id,
                         analysis_type=job.analysis_type,
                         dossier_json=dossier_json,
