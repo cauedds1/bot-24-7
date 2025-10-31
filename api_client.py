@@ -25,12 +25,35 @@ HEADERS = {
     "x-rapidapi-key": os.getenv("API_FOOTBALL_KEY")
 }
 
-# Cliente HTTP assíncrono global
-http_client = httpx.AsyncClient(timeout=10.0, headers=HEADERS)
+# Cliente HTTP assíncrono global - lazy initialization para garantir event loop correto
+http_client = None
+
+def get_http_client():
+    """
+    Retorna o cliente HTTP, criando-o se necessário.
+    Garante que o cliente seja criado no event loop correto.
+    """
+    global http_client
+    if http_client is None:
+        # Criar com limits para evitar resource leak
+        http_client = httpx.AsyncClient(
+            timeout=10.0, 
+            headers=HEADERS,
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+        )
+    return http_client
 
 async def close_http_client():
     """Fecha o cliente HTTP para evitar vazamento de conexões."""
-    await http_client.aclose()
+    global http_client
+    if http_client is not None:
+        try:
+            await http_client.aclose()
+        except RuntimeError as e:
+            # Ignorar se o event loop já está fechado
+            if "Event loop is closed" not in str(e):
+                raise
+        http_client = None
 
 @retry(
     stop=stop_after_attempt(5),
@@ -59,7 +82,8 @@ async def api_request_with_retry(method: str, url: str, **kwargs):
     Raises:
         httpx.HTTPStatusError: Após todas as tentativas falharem
     """
-    response = await http_client.request(method, url, **kwargs)
+    client = get_http_client()
+    response = await client.request(method, url, **kwargs)
     
     if response.status_code in (502, 503):
         response.raise_for_status()
