@@ -534,17 +534,32 @@ def buscar_jogos_do_dia():
 def buscar_classificacao_liga(id_liga: int):
     cache_key = f"classificacao_{id_liga}"
     if cached_data := cache_manager.get(cache_key): return cached_data
-    params = {"league": str(id_liga), "season": "2025"}
+    
+    # Determinar temporada atual automaticamente (horário de Brasília)
+    brasilia_tz = ZoneInfo("America/Sao_Paulo")
+    agora = datetime.now(brasilia_tz)
+    mes_atual = agora.month
+    ano_atual = agora.year
+    
+    # Se estamos entre janeiro-junho, usar ano anterior (maioria das ligas termina em maio/junho)
+    # Se estamos entre julho-dezembro, usar ano atual (novas temporadas começam em agosto)
+    season = str(ano_atual) if mes_atual >= 7 else str(ano_atual - 1)
+    
+    params = {"league": str(id_liga), "season": season}
     try:
         time.sleep(1.6)
+        print(f"  🔍 Buscando classificação: Liga {id_liga}, Season {season}")
         response = requests.get(API_URL + "standings", headers=HEADERS, params=params, timeout=10)
         response.raise_for_status()
         if data := response.json().get('response'):
             if data and data[0]['league']['standings']:
                 classificacao = data[0]['league']['standings'][0]
                 cache_manager.set(cache_key, classificacao)
+                print(f"  ✅ Classificação retornada: {len(classificacao)} times")
                 return classificacao
-    except Exception: pass
+        print(f"  ⚠️ Nenhuma classificação encontrada para Liga {id_liga}, Season {season}")
+    except Exception as e:
+        print(f"  ❌ Erro ao buscar classificação: {str(e)[:100]}")
     return None
 
 def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
@@ -765,6 +780,14 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
                 print(f"        Cartões Casa: {cartoes_amarelos_casa_soma} amarelos / {cartoes_vermelhos_casa_soma} vermelhos")
                 print(f"        Cartões Fora: {cartoes_amarelos_fora_soma} amarelos / {cartoes_vermelhos_fora_soma} vermelhos")
 
+        # Preservar campos essenciais do API para cálculo de QSC Dinâmico
+        form_string = data.get('form', '')
+        goals_raw = data.get('goals', {})
+        
+        print(f"  📋 Campos essenciais capturados:")
+        print(f"     Form: '{form_string}' (len: {len(form_string)})")
+        print(f"     Goals structure: {bool(goals_raw)}")
+        
         analise = {
             "casa": {
                 "gols_marcados": gols_casa_marcados,
@@ -787,7 +810,10 @@ def buscar_estatisticas_gerais_time(time_id: int, id_liga: int):
                 "cartoes_amarelos": cartoes_amarelos_fora,
                 "cartoes_vermelhos": cartoes_vermelhos_fora,
                 "vitorias": vitorias_fora
-            }
+            },
+            # CAMPOS ESSENCIAIS PARA QSC DINÂMICO
+            "form": form_string,
+            "goals": goals_raw
         }
 
         cache_manager.set(cache_key, analise)
