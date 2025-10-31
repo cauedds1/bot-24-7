@@ -12,7 +12,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 
 import cache_manager
 from db_manager import DatabaseManager
-from config import JOGOS_POR_PAGINA, ODD_MINIMA_DE_VALOR
+from config import JOGOS_POR_PAGINA
 from api_client import (buscar_jogos_do_dia, buscar_estatisticas_gerais_time, buscar_classificacao_liga, 
                         buscar_odds_do_jogo, buscar_ligas_disponiveis_hoje, buscar_jogos_por_liga, NOMES_LIGAS_PT,
                         buscar_ultimos_jogos_time, buscar_todas_ligas_suportadas, ORDEM_PAISES)
@@ -25,7 +25,7 @@ from analysts.cards_analyzer import analisar_mercado_cartoes
 from analysts.shots_analyzer import analisar_mercado_finalizacoes
 from analysts.handicaps_analyzer import analisar_mercado_handicaps
 # PHOENIX V3.0: filtrar_mercados_por_contexto e get_quality_scores foram removidas na refatoração
-from analysts.value_detector import detectar_valor_contextual, calculate_value_score, format_value_percentage, get_value_rating
+# PURE ANALYST PROTOCOL: value_detector removido - análise independente de odds
 from analysts.justification_generator import generate_persuasive_justification
 import job_queue
 import pagination_helpers
@@ -475,11 +475,11 @@ async def gerar_analise_completa_todos_mercados(jogo):
     data_jogo_brt = data_jogo_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
     horario_formatado = data_jogo_brt.strftime("%d/%m/%Y %H:%M")
     
-    # ========== 🎯 PRIORIZAÇÃO GLOBAL POR VALUE SCORE ==========
-    print("--- 🎯 GLOBAL VALUE PRIORITIZATION STARTED ---")
+    # ========== 🎯 PURE ANALYST: PRIORIZAÇÃO POR CONFIANÇA ==========
+    print("--- 🎯 PURE ANALYST PRIORITIZATION STARTED ---")
     
-    # Coletar TODOS os palpites de TODOS os mercados com Value Score
-    todos_palpites_com_value = []
+    # Coletar TODOS os palpites de TODOS os mercados ordenados por Confiança
+    todos_palpites_por_confianca = []
     
     mercados_analise = [
         ('Gols', '⚽', analise_gols),
@@ -495,70 +495,31 @@ async def gerar_analise_completa_todos_mercados(jogo):
         if not analise or not analise.get('palpites'):
             continue
         
-        for palpite in analise['palpites'][:3]:  # Pegar top 3 de cada mercado
-            # ========== DIVERGENT LOGIC: Check if Tactical Tip ==========
-            is_tactical = palpite.get('is_tactical', False)
+        for palpite in analise['palpites'][:5]:  # Pegar top 5 de cada mercado
+            confianca = palpite.get('confianca', 0)
+            probabilidade = palpite.get('probabilidade', confianca * 10)
             
-            if is_tactical:
-                # TACTICAL TIP: Exempt from odd validation
-                print(f"  🧠 Tactical Tip detectado: {mercado_nome} - {palpite.get('tipo')} (Conf: {palpite.get('confianca')}/10)")
-                
-                # Use confiança como métrica de prioridade (normalizada para escala similar ao value_score)
-                # Confiança 10/10 = value_score equivalente de ~0.5 (médio-alto)
-                # Isso permite que tactical tips de alta confiança compitam com bets de value médio
-                tactical_priority = palpite.get('confianca', 5) / 20.0  # 10/10 -> 0.5, 8/10 -> 0.4
-                
-                todos_palpites_com_value.append({
-                    'mercado_nome': mercado_nome,
-                    'mercado_emoji': mercado_emoji,
-                    'palpite': palpite,
-                    'value_score': tactical_priority,
-                    'bot_probability': palpite.get('confianca', 0) / 10.0,
-                    'is_tactical': True
-                })
-                continue  # Pular validação de odds
+            print(f"  📊 {mercado_nome}: {palpite.get('tipo')} - Confiança: {confianca}/10 ({probabilidade}%)")
             
-            # REGULAR BET: Validate odd and calculate value
-            odd = palpite.get('odd')
-            if odd is None or odd == 'N/A' or odd == '':
-                print(f"  ⚠️ Palpite ignorado (odd inválida): {mercado_nome} - {palpite.get('tipo')}")
-                continue
-            
-            # Validar que odd é numérica
-            try:
-                odd_float = float(odd)
-                if odd_float <= 1.0:
-                    print(f"  ⚠️ Palpite ignorado (odd <= 1.0): {mercado_nome} - {palpite.get('tipo')} @{odd}")
-                    continue
-            except (ValueError, TypeError):
-                print(f"  ⚠️ Palpite ignorado (odd não numérica): {mercado_nome} - {palpite.get('tipo')} @{odd}")
-                continue
-            
-            # Calcular Value Score
-            bot_prob = palpite.get('probabilidade', palpite.get('confianca', 0) * 10) / 100.0
-            value_score = calculate_value_score(bot_prob, odd_float)
-            
-            # Adicionar à lista global
-            todos_palpites_com_value.append({
+            todos_palpites_por_confianca.append({
                 'mercado_nome': mercado_nome,
                 'mercado_emoji': mercado_emoji,
                 'palpite': palpite,
-                'value_score': value_score,
-                'bot_probability': bot_prob,
-                'is_tactical': False
+                'confianca': confianca,
+                'probabilidade': probabilidade,
+                'is_tactical': palpite.get('is_tactical', False)
             })
     
-    # Ordenar por Value Score (maior primeiro)
-    todos_palpites_com_value.sort(key=lambda x: x['value_score'], reverse=True)
+    # Ordenar por Confiança (maior primeiro)
+    todos_palpites_por_confianca.sort(key=lambda x: x['confianca'], reverse=True)
     
-    print(f"  📊 Total de {len(todos_palpites_com_value)} palpites analisados")
-    if todos_palpites_com_value:
-        print(f"  🏆 Melhor Value: {todos_palpites_com_value[0]['value_score']:.3f} ({todos_palpites_com_value[0]['mercado_nome']})")
+    print(f"  📊 Total de {len(todos_palpites_por_confianca)} tendências analisadas")
+    if todos_palpites_por_confianca:
+        print(f"  🏆 Maior Confiança: {todos_palpites_por_confianca[0]['confianca']}/10 ({todos_palpites_por_confianca[0]['mercado_nome']})")
     
-    # Separar TOP PICKS (3 melhores) e Sugestões Alternativas
-    # FILTRAR: Sugestões alternativas devem ter value >= 0 (sem value negativo)
-    top_picks = todos_palpites_com_value[:3]
-    sugestoes_alternativas = [p for p in todos_palpites_com_value[3:8] if p['value_score'] >= 0]
+    # Separar Análise Principal (maior confiança) e Outras Tendências
+    analise_principal = todos_palpites_por_confianca[:1]
+    outras_tendencias = todos_palpites_por_confianca[1:6]
     
     # ========== CONSTRUIR MENSAGEM ==========
     mensagem = f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -582,41 +543,36 @@ async def gerar_analise_completa_todos_mercados(jogo):
     if not (power_home == 50 and power_away == 50):
         mensagem += f"📊 Power: Casa {power_home} | Fora {power_away}\n\n"
     
-    # ========== TOP PICKS (MELHORES MERCADOS) ==========
-    if top_picks:
+    # ========== 💎 ANÁLISE PRINCIPAL (MAIOR CONFIANÇA) ==========
+    if analise_principal:
         mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        mensagem += f"💎 <b>TOP PICKS (MAIOR VALOR)</b>\n"
+        mensagem += f"💎 <b>ANÁLISE PRINCIPAL (Maior Confiança)</b>\n"
         mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
-        for idx, item in enumerate(top_picks, 1):
-            p = item['palpite']
-            value_score = item['value_score']
-            value_pct = format_value_percentage(value_score)
-            rating, emoji = get_value_rating(value_score)
-            
-            mensagem += f"{item['mercado_emoji']} <b>#{idx} - {item['mercado_nome']}</b>\n"
-            
-            odd_str = f" <b>@{p['odd']}</b>" if p.get('odd') and p.get('odd') > 0 else " <i>(Oportunidade Tática)</i>"
-            mensagem += f"  📌 <b>{p['tipo']}</b> ({p.get('periodo', 'FT')}){odd_str}\n"
-            mensagem += f"  💎 <b>Value:</b> {emoji} {value_pct} ({rating})\n"
-            mensagem += f"  🎯 <b>Probabilidade:</b> {item['bot_probability']:.0%} | <b>Confiança:</b> {p.get('confianca', 'N/A')}/10\n\n"
+        item = analise_principal[0]
+        p = item['palpite']
+        
+        mensagem += f"{item['mercado_emoji']} <b>{item['mercado_nome']}</b>\n"
+        mensagem += f"  📌 <b>Tendência:</b> Jogo para {p['tipo']} ({p.get('periodo', 'FT')})\n"
+        mensagem += f"  🎯 <b>Probabilidade:</b> {item['probabilidade']:.0f}%\n"
+        mensagem += f"  ⭐ <b>Confiança:</b> {item['confianca']}/10\n"
+        
+        # Justificativa se disponível
+        if p.get('justificativa'):
+            mensagem += f"  💬 <i>{p['justificativa']}</i>\n"
         
         mensagem += "\n"
     
-    # ========== SUGESTÕES ALTERNATIVAS ==========
-    if sugestoes_alternativas:
+    # ========== 🧠 OUTRAS TENDÊNCIAS DE ALTA CONFIANÇA ==========
+    if outras_tendencias:
         mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        mensagem += f"💡 <b>SUGESTÕES ALTERNATIVAS</b>\n"
+        mensagem += f"🧠 <b>OUTRAS TENDÊNCIAS DE ALTA CONFIANÇA</b>\n"
         mensagem += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
-        for item in sugestoes_alternativas:
+        for item in outras_tendencias:
             p = item['palpite']
-            value_score = item['value_score']
-            value_pct = format_value_percentage(value_score)
-            rating, emoji = get_value_rating(value_score)
-            
-            odd_str = f" @{p['odd']}" if p.get('odd') and p.get('odd') > 0 else " (Tática)"
-            mensagem += f"{item['mercado_emoji']} <b>{item['mercado_nome']}:</b> {p['tipo']} ({p.get('periodo', 'FT')}){odd_str} - {emoji} {value_pct}\n"
+            mensagem += f"{item['mercado_emoji']} <b>{item['mercado_nome']}:</b> {p['tipo']} ({p.get('periodo', 'FT')})\n"
+            mensagem += f"   Conf: {item['confianca']}/10 | Prob: {item['probabilidade']:.0f}%\n"
         
         mensagem += "\n"
     
@@ -803,14 +759,8 @@ async def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=No
                 if time_info['team']['name'] == jogo['teams']['away']['name']:
                     pos_fora = time_info['rank']
 
-        # 💎 DETECÇÃO DE VALOR CONTEXTUAL
-        # Identifica se odds "baixas" (1.50-2.50) têm valor baseado no contexto do jogo
-        contextos_valor = detectar_valor_contextual(stats_casa, stats_fora, jogo, classificacao)
-
-        if any(contextos_valor.values()):
-            contextos_ativos = [k for k, v in contextos_valor.items() if v]
-            print(f"  💎 VALOR CONTEXTUAL DETECTADO: {', '.join(contextos_ativos)}")
-            print(f"     → Bot aceita odds menores (1.50+) para favoritos/clássicos/jogos decisivos")
+        # PURE ANALYST PROTOCOL: Análise independente de valor de mercado
+        print(f"  🧠 PURE ANALYST MODE: Análise baseada em probabilidades estatísticas")
 
         # 📜 PHOENIX V3.0: game_script agora vem do master_analyzer
         # Buscar análise master para contexto tático
@@ -1125,23 +1075,16 @@ async def coletar_todos_palpites_disponiveis():
             if analise and 'palpites' in analise:
                 mercado_nome = analise.get('mercado', '')
                 for palpite in analise['palpites']:
-                    # Converter odd para float de forma segura
-                    odd_raw = palpite.get('odd', 0)
-                    try:
-                        odd_float = float(odd_raw) if odd_raw not in [None, "N/A", ""] else 0
-                    except (ValueError, TypeError):
-                        odd_float = 0
-
-                    if odd_float >= ODD_MINIMA_DE_VALOR:
-                        todos_palpites_globais.append({
-                            'jogo': jogo,
-                            'palpite': palpite,
-                            'mercado': mercado_nome,  # Adicionar mercado aqui
-                            'time_casa': jogo['teams']['home']['name'],
-                            'time_fora': jogo['teams']['away']['name'],
-                            'liga': jogo['league']['name'],
-                            'horario': jogo['fixture']['date']
-                        })
+                    # PURE ANALYST: Não filtra por odd mínima, apenas por confiança
+                    todos_palpites_globais.append({
+                        'jogo': jogo,
+                        'palpite': palpite,
+                        'mercado': mercado_nome,  # Adicionar mercado aqui
+                        'time_casa': jogo['teams']['home']['name'],
+                        'time_fora': jogo['teams']['away']['name'],
+                        'liga': jogo['league']['name'],
+                        'horario': jogo['fixture']['date']
+                    })
 
     # DIAGNÓSTICO: Log de produtividade
     print(f"\n📊 RELATÓRIO DE GERAÇÃO DE PALPITES:")
@@ -1161,42 +1104,20 @@ def converter_odd_para_float(odd_raw):
     except (ValueError, TypeError):
         return 0.0
 
-def calcular_valor_palpite(palpite_data):
-    """
-    Calcula o 'valor' de um palpite baseado em confiança, odd e coerência.
-    Quanto maior o score, melhor o palpite.
-    """
-    palpite = palpite_data['palpite']
-    confianca = palpite.get('confianca', 0)
-    odd = converter_odd_para_float(palpite.get('odd', 1.0))
-
-    # Fórmula de valor: prioriza alta confiança com odds razoáveis
-    # Penaliza odds muito baixas (<1.30) e muito altas (>3.5)
-    if odd < 1.30:
-        penalidade_odd = 0.7  # Odd muito baixa
-    elif odd > 3.5:
-        penalidade_odd = 0.8  # Odd muito alta (risco)
-    elif 1.50 <= odd <= 2.20:
-        penalidade_odd = 1.2  # Sweet spot: boas odds com valor
-    else:
-        penalidade_odd = 1.0
-
-    # Score = confiança * penalidade * (odd normalizada)
-    valor = confianca * penalidade_odd * min(odd / 1.5, 2.0)
-
-    return valor
+# PURE ANALYST PROTOCOL: calcular_valor_palpite removido
+# Priorização agora é baseada apenas em confiança
 
 async def gerar_aposta_simples():
     """
-    Gera UMA ÚNICA aposta de alta confiança de TODOS os jogos/mercados.
-    Usa sistema de pontuação de VALOR (não aleatório).
+    PURE ANALYST: Gera UMA ÚNICA tendência de alta confiança de TODOS os jogos/mercados.
+    Prioriza confiança estatística pura (sem dependência de odds).
     """
     todos_palpites = await coletar_todos_palpites_disponiveis()
 
     if not todos_palpites:
         return None
 
-    # Filtrar apenas palpites com confiança >= 6.0 (recalibrado para capturar mais oportunidades)
+    # Filtrar palpites com confiança >= 6.0
     palpites_alta_confianca = [p for p in todos_palpites if p['palpite'].get('confianca', 0) >= 6.0]
 
     if not palpites_alta_confianca:
@@ -1206,32 +1127,25 @@ async def gerar_aposta_simples():
     if not palpites_alta_confianca:
         palpites_alta_confianca = todos_palpites  # Último fallback: usar todos
 
-    # Calcular valor de cada palpite
-    palpites_com_valor = []
-    for p in palpites_alta_confianca:
-        valor = calcular_valor_palpite(p)
-        palpites_com_valor.append((p, valor))
+    # Ordenar por confiança (maior primeiro)
+    palpites_alta_confianca.sort(key=lambda x: x['palpite'].get('confianca', 0), reverse=True)
 
-    # Ordenar por valor (maior primeiro)
-    palpites_com_valor.sort(key=lambda x: x[1], reverse=True)
-
-    # Escolher entre os TOP 10 com maior valor (adiciona alguma aleatoriedade)
-    top_palpites = palpites_com_valor[:min(10, len(palpites_com_valor))]
-    escolhido = random.choice(top_palpites)[0]
+    # Escolher entre os TOP 10 com maior confiança (adiciona alguma aleatoriedade)
+    top_palpites = palpites_alta_confianca[:min(10, len(palpites_alta_confianca))]
+    escolhido = random.choice(top_palpites)
 
     return escolhido
 
 async def gerar_multipla_inteligente(min_jogos, max_jogos):
     """
-    Gera múltipla com N jogos usando seleções coerentes e de alta confiança.
-    Prioriza palpites com MELHOR VALOR (relação confiança/odd).
+    PURE ANALYST: Gera múltipla com N jogos priorizando confiança estatística pura.
     """
     todos_palpites = await coletar_todos_palpites_disponiveis()
 
     if not todos_palpites:
         return []
 
-    # Filtrar apenas palpites com confiança >= 5.5 (recalibrado)
+    # Filtrar palpites com confiança >= 5.5
     palpites_bons = [p for p in todos_palpites if p['palpite'].get('confianca', 0) >= 5.5]
 
     if len(palpites_bons) < min_jogos:
@@ -1246,38 +1160,27 @@ async def gerar_multipla_inteligente(min_jogos, max_jogos):
             jogos_disponiveis[fixture_id] = []
         jogos_disponiveis[fixture_id].append(p)
 
-    # Selecionar 1 palpite por jogo usando SISTEMA DE VALOR
+    # Selecionar palpite de maior confiança por jogo
     palpites_selecionados = []
     for fixture_id, palpites_jogo in jogos_disponiveis.items():
-        # Calcular valor de cada palpite do jogo
-        palpites_com_valor = []
-        for p in palpites_jogo:
-            valor = calcular_valor_palpite(p)
-            palpites_com_valor.append((p, valor))
-
-        # Escolher o de MAIOR VALOR (não necessariamente maior confiança)
-        melhor_palpite = max(palpites_com_valor, key=lambda x: x[1])[0]
+        # Escolher o de MAIOR CONFIANÇA
+        melhor_palpite = max(palpites_jogo, key=lambda x: x['palpite'].get('confianca', 0))
         palpites_selecionados.append(melhor_palpite)
 
-    # Ordenar por valor e pegar os melhores
-    palpites_ordenados = []
-    for p in palpites_selecionados:
-        valor = calcular_valor_palpite(p)
-        palpites_ordenados.append((p, valor))
+    # Ordenar por confiança
+    palpites_selecionados.sort(key=lambda x: x['palpite'].get('confianca', 0), reverse=True)
 
-    palpites_ordenados.sort(key=lambda x: x[1], reverse=True)
-
-    # ALEATORIEDADE: Escolher entre os TOP candidatos (não sempre os mesmos)
-    num_jogos = random.randint(min_jogos, min(max_jogos, len(palpites_ordenados)))
+    # Escolher entre os TOP candidatos
+    num_jogos = random.randint(min_jogos, min(max_jogos, len(palpites_selecionados)))
 
     # Pegar 2x o número necessário dos melhores e embaralhar
-    pool_size = min(num_jogos * 2, len(palpites_ordenados))
-    pool_candidatos = palpites_ordenados[:pool_size]
+    pool_size = min(num_jogos * 2, len(palpites_selecionados))
+    pool_candidatos = palpites_selecionados[:pool_size]
 
     # Embaralhar e pegar N jogos aleatórios do pool
     random.shuffle(pool_candidatos)
 
-    return [p[0] for p in pool_candidatos[:num_jogos]]
+    return pool_candidatos[:num_jogos]
 
 async def gerar_bingo_odd_alta(odd_min, odd_max):
     """
@@ -1312,33 +1215,24 @@ async def gerar_bingo_odd_alta(odd_min, odd_max):
             jogos_disponiveis[fixture_id] = []
         jogos_disponiveis[fixture_id].append(p)
 
-    # Selecionar melhor palpite de cada jogo usando SISTEMA DE VALOR
+    # PURE ANALYST: Selecionar palpite de maior confiança de cada jogo
     palpites_disponiveis = []
     for fixture_id, palpites_jogo in jogos_disponiveis.items():
-        palpites_com_valor = []
-        for p in palpites_jogo:
-            valor = calcular_valor_palpite(p)
-            palpites_com_valor.append((p, valor))
-
-        melhor_palpite = max(palpites_com_valor, key=lambda x: x[1])[0]
+        # Escolher o de maior confiança
+        melhor_palpite = max(palpites_jogo, key=lambda x: x['palpite'].get('confianca', 0))
         palpites_disponiveis.append(melhor_palpite)
 
-    # Ordenar por VALOR (melhores primeiro)
-    palpites_ordenados = []
-    for p in palpites_disponiveis:
-        valor = calcular_valor_palpite(p)
-        palpites_ordenados.append((p, valor))
-
-    palpites_ordenados.sort(key=lambda x: x[1], reverse=True)
+    # Ordenar por CONFIANÇA (melhores primeiro)
+    palpites_disponiveis.sort(key=lambda x: x['palpite'].get('confianca', 0), reverse=True)
 
     # ESTRATÉGIA: Priorizar odds médias (@1.30-2.00) para construir odd alta com volume
     multipla_final = []
     odd_acumulada = 1.0
 
     # Separar palpites por faixa de odd
-    odds_baixas = [p for p, v in palpites_ordenados if 1.30 <= converter_odd_para_float(p['palpite'].get('odd', 1.0)) <= 1.60]
-    odds_medias = [p for p, v in palpites_ordenados if 1.60 < converter_odd_para_float(p['palpite'].get('odd', 1.0)) <= 2.20]
-    odds_altas = [p for p, v in palpites_ordenados if 2.20 < converter_odd_para_float(p['palpite'].get('odd', 1.0)) <= 3.0]
+    odds_baixas = [p for p in palpites_disponiveis if 1.30 <= converter_odd_para_float(p['palpite'].get('odd', 1.0)) <= 1.60]
+    odds_medias = [p for p in palpites_disponiveis if 1.60 < converter_odd_para_float(p['palpite'].get('odd', 1.0)) <= 2.20]
+    odds_altas = [p for p in palpites_disponiveis if 2.20 < converter_odd_para_float(p['palpite'].get('odd', 1.0)) <= 3.0]
 
     # ALEATORIEDADE: Embaralhar cada faixa para gerar múltiplas diferentes
     random.shuffle(odds_baixas)
@@ -2097,49 +1991,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.edit_message_text(text=mensagem, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
     elif data == 'configuracoes':
-        # Obter configurações atuais do usuário (ou padrões)
-        odd_minima = context.user_data.get('odd_minima', ODD_MINIMA_DE_VALOR)
+        # PURE ANALYST: Apenas configurações de confiança (sem odd mínima)
         confianca_minima = context.user_data.get('confianca_minima', 6.0)
 
         mensagem = (
-            f"⚙️ <b>Configurações</b>\n\n"
-            f"📊 <b>Configurações Atuais:</b>\n"
-            f"  • Odd Mínima: {odd_minima}\n"
+            f"⚙️ <b>Configurações (Pure Analyst)</b>\n\n"
+            f"📊 <b>Configuração Atual:</b>\n"
             f"  • Confiança Mínima: {confianca_minima}/10\n\n"
+            f"🧠 O Pure Analyst prioriza análises estatísticas puras,\n"
+            f"independentemente das odds de mercado.\n\n"
             f"🔧 Escolha o que deseja ajustar:"
         )
 
         keyboard = [
-            [InlineKeyboardButton("📈 Odd Mínima", callback_data='config_odd_minima'),
-             InlineKeyboardButton("🎯 Confiança Mínima", callback_data='config_confianca')],
-            [InlineKeyboardButton("🔄 Restaurar Padrões", callback_data='config_resetar')],
+            [InlineKeyboardButton("🎯 Confiança Mínima", callback_data='config_confianca')],
+            [InlineKeyboardButton("🔄 Restaurar Padrão", callback_data='config_resetar')],
             [InlineKeyboardButton("🔙 Voltar ao Menu", callback_data='voltar_menu')]
         ]
         await query.edit_message_text(text=mensagem, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-
-    elif data == 'config_odd_minima':
-        keyboard = [
-            [InlineKeyboardButton("1.30", callback_data='set_odd_1.30'), 
-             InlineKeyboardButton("1.50", callback_data='set_odd_1.50')],
-            [InlineKeyboardButton("1.70", callback_data='set_odd_1.70'), 
-             InlineKeyboardButton("2.00", callback_data='set_odd_2.00')],
-            [InlineKeyboardButton("🔙 Voltar", callback_data='configuracoes')]
-        ]
-        await query.edit_message_text(
-            text="📈 <b>Selecione a Odd Mínima</b>\n\nApenas apostas com odd igual ou superior serão mostradas:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
-        )
-
-    elif data.startswith('set_odd_'):
-        odd_valor = float(data.split('_')[2])
-        context.user_data['odd_minima'] = odd_valor
-        await query.answer(f"✅ Odd mínima alterada para {odd_valor}")
-        await query.edit_message_text(
-            text=f"✅ <b>Configuração Salva!</b>\n\nOdd mínima agora é {odd_valor}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data='configuracoes')]]),
-            parse_mode='HTML'
-        )
 
     elif data == 'config_confianca':
         keyboard = [
@@ -2166,11 +2035,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
     elif data == 'config_resetar':
-        context.user_data['odd_minima'] = ODD_MINIMA_DE_VALOR
         context.user_data['confianca_minima'] = 6.0
-        await query.answer("✅ Configurações restauradas!")
+        await query.answer("✅ Configuração restaurada!")
         await query.edit_message_text(
-            text=f"✅ <b>Configurações Restauradas!</b>\n\nOdd mínima: {ODD_MINIMA_DE_VALOR}\nConfiança mínima: 6.0/10",
+            text=f"✅ <b>Configuração Restaurada!</b>\n\nConfiança mínima: 6.0/10",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data='configuracoes')]]),
             parse_mode='HTML'
         )

@@ -267,70 +267,22 @@ def apply_tactical_script_modifier(
     return 0.0
 
 
-def apply_value_score_modifier(value_score_pct: float) -> float:
-    """
-    STEP 3b: Aplica modificador baseado no Value Score.
-    
-    Value Score alto indica ineficiência do mercado (odd generosa).
-    
-    Args:
-        value_score_pct: Value em % (pode ser negativo)
-    
-    Returns:
-        float: Modificador (0 a +1.0)
-    """
-    if value_score_pct >= 20:
-        return 1.0  # Value excelente
-    elif value_score_pct >= 10:
-        return 0.7
-    elif value_score_pct >= 5:
-        return 0.4
-    elif value_score_pct >= 0:
-        return 0.2
-    else:
-        return 0.0  # Sem value
-
-
-def apply_odd_risk_modifier(odd: float) -> float:
-    """
-    STEP 3c: Aplica penalidade por odd extrema (alto risco).
-    
-    Args:
-        odd: Odd da aposta
-    
-    Returns:
-        float: Modificador (-1.0 a +0.3)
-    """
-    if odd < 1.20:
-        return -0.5  # Odd muito baixa, pouco valor
-    elif odd <= 1.40:
-        return -0.2
-    elif 1.50 <= odd <= 2.50:
-        return 0.3  # Sweet spot
-    elif 2.50 < odd <= 3.50:
-        return 0.0  # Neutro
-    elif 3.50 < odd <= 5.0:
-        return -0.5  # Risco moderado
-    else:
-        return -1.0  # Risco alto
+# PURE ANALYST PROTOCOL: Value and odd modifiers removed
+# Analysis is now independent of market odds
 
 
 def calculate_final_confidence(
     statistical_probability_pct: float,
     bet_type: str,
-    tactical_script: Optional[str] = None,
-    value_score_pct: float = 0.0,
-    odd: float = 2.0
+    tactical_script: Optional[str] = None
 ) -> Tuple[float, Dict[str, float]]:
     """
-    STEP 4: Calcula Confiança Final usando o modelo completo.
+    PURE ANALYST PROTOCOL - STEP 4: Calcula Confiança Final (sem dependência de odds).
     
     Args:
         statistical_probability_pct: Probabilidade estatística base (0-100%)
         bet_type: Tipo da aposta
         tactical_script: Script tático (opcional)
-        value_score_pct: Value score em %
-        odd: Odd da aposta
     
     Returns:
         tuple: (confianca_final, breakdown_dict)
@@ -338,13 +290,11 @@ def calculate_final_confidence(
     # STEP 2: Base confidence
     base_conf = convert_probability_to_base_confidence(statistical_probability_pct)
     
-    # STEP 3: Modifiers
+    # STEP 3: Tactical script modifier only
     mod_script = apply_tactical_script_modifier(base_conf, bet_type, tactical_script)
-    mod_value = apply_value_score_modifier(value_score_pct)
-    mod_odd = apply_odd_risk_modifier(odd)
     
-    # STEP 4: Final
-    final_conf = base_conf + mod_script + mod_value + mod_odd
+    # STEP 4: Final (simplified - no value/odd modifiers)
+    final_conf = base_conf + mod_script
     
     # Cap entre 1.0 e 10.0
     final_conf = max(1.0, min(10.0, final_conf))
@@ -353,8 +303,6 @@ def calculate_final_confidence(
         "probabilidade_base": statistical_probability_pct,
         "confianca_base": base_conf,
         "modificador_script": mod_script,
-        "modificador_value": mod_value,
-        "modificador_odd": mod_odd,
         "confianca_final": final_conf
     }
     
