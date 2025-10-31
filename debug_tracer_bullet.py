@@ -9,16 +9,16 @@ Fixture de Teste: 1376437 (Willem II vs Telstar - Eredivisie)
 
 import asyncio
 import sys
+import os
 from api_client import (
-    buscar_detalhes_jogo,
     buscar_estatisticas_jogo,
     buscar_estatisticas_gerais_time,
     buscar_ultimos_jogos_time,
     buscar_classificacao_liga,
     get_current_season,
-    get_http_client
+    api_request_with_retry,
+    API_URL
 )
-from analysts.master_analyzer import gerar_analise_completa
 
 # 🎯 FIXTURE DE TESTE - HARDCODED
 TARGET_FIXTURE_ID = 1376437  # Willem II vs Telstar - Eredivisie
@@ -40,20 +40,34 @@ async def main():
         # Passo 1: Buscar detalhes básicos do jogo
         print("\n[PASSO 1/6] 🔍 Buscando detalhes básicos do jogo...")
         print("-" * 80)
-        detalhes_jogo = await buscar_detalhes_jogo(TARGET_FIXTURE_ID)
         
-        if not detalhes_jogo:
-            print("❌ FALHA CRÍTICA: Não foi possível obter detalhes do jogo")
+        # Chamar API diretamente para pegar detalhes do fixture
+        params = {"id": str(TARGET_FIXTURE_ID)}
+        response = await api_request_with_retry("GET", API_URL + "fixtures", params=params)
+        response.raise_for_status()
+        
+        response_json = response.json()
+        fixtures_data = response_json.get('response', [])
+        
+        if not fixtures_data or len(fixtures_data) == 0:
+            print(f"❌ FALHA CRÍTICA: Fixture {TARGET_FIXTURE_ID} não encontrado na API")
+            print(f"   Response: {response_json}")
             return
+        
+        detalhes_jogo = fixtures_data[0]
         
         home_team_id = detalhes_jogo['teams']['home']['id']
         away_team_id = detalhes_jogo['teams']['away']['id']
         home_team_name = detalhes_jogo['teams']['home']['name']
         away_team_name = detalhes_jogo['teams']['away']['name']
+        fixture_date = detalhes_jogo['fixture']['date']
+        fixture_status = detalhes_jogo['fixture']['status']['short']
         
         print(f"✅ Detalhes obtidos:")
         print(f"   Casa: {home_team_name} (ID: {home_team_id})")
         print(f"   Fora: {away_team_name} (ID: {away_team_id})")
+        print(f"   Data: {fixture_date}")
+        print(f"   Status: {fixture_status}")
         
         # Passo 2: Buscar estatísticas do jogo
         print("\n[PASSO 2/6] 📊 Buscando estatísticas do jogo...")
