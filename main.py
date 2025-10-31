@@ -5,6 +5,7 @@ import random
 import asyncio
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
@@ -431,7 +432,6 @@ def gerar_analise_completa_todos_mercados(jogo):
     nome_liga = liga_info[0] if liga_info else jogo['league']['name']
     
     # Converter horário UTC → BRT (America/Sao_Paulo)
-    from zoneinfo import ZoneInfo
     data_jogo_utc = datetime.fromisoformat(jogo['fixture']['date'].replace('Z', '+00:00'))
     data_jogo_brt = data_jogo_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
     horario_formatado = data_jogo_brt.strftime("%d/%m/%Y %H:%M")
@@ -908,9 +908,9 @@ def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=None):
     pais_real = jogo['league']['country']
     print(f"🔍 LIGA: ID={liga_id} | Nome API='{liga_real}' ({pais_real}) | Nome Bot='{nome_liga}'")
 
-    # Converter horário para Brasília (UTC-3)
+    # Converter horário para Brasília
     data_utc = datetime.strptime(jogo['fixture']['date'], '%Y-%m-%dT%H:%M:%S%z')
-    data_brasilia = data_utc - timedelta(hours=3)  # UTC-3 = Brasília
+    data_brasilia = data_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
     horario_formatado = data_brasilia.strftime('%H:%M')
 
     # ========== NOVA ESTRUTURA ==========
@@ -1915,7 +1915,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         jogo = aposta['jogo']
 
         data_utc = datetime.strptime(jogo['fixture']['date'], '%Y-%m-%dT%H:%M:%S%z')
-        data_brasilia = data_utc - timedelta(hours=3)
+        data_brasilia = data_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
         horario = data_brasilia.strftime('%H:%M')
 
         periodo = palpite.get('periodo', 'FT')
@@ -1979,7 +1979,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             mercado = item.get('mercado', '')
 
             data_utc = datetime.strptime(jogo['fixture']['date'], '%Y-%m-%dT%H:%M:%S%z')
-            data_brasilia = data_utc - timedelta(hours=3)
+            data_brasilia = data_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
             horario = data_brasilia.strftime('%H:%M')
 
             periodo_str = f" ({palpite.get('periodo', 'FT')})" if palpite.get('periodo') != 'FT' else ""
@@ -2037,7 +2037,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             mercado = item.get('mercado', '')
 
             data_utc = datetime.strptime(jogo['fixture']['date'], '%Y-%m-%dT%H:%M:%S%z')
-            data_brasilia = data_utc - timedelta(hours=3)
+            data_brasilia = data_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
             horario = data_brasilia.strftime('%H:%M')
 
             periodo_str = f" ({palpite.get('periodo', 'FT')})" if palpite.get('periodo') != 'FT' else ""
@@ -2243,9 +2243,10 @@ async def mostrar_jogos_da_liga_buscar(query, context: ContextTypes.DEFAULT_TYPE
         fixture = jogo['fixture']
         teams = jogo['teams']
         
-        # Formatar horário
+        # Formatar horário - Converter para Brasília
         data_jogo = datetime.fromisoformat(fixture['date'].replace('Z', '+00:00'))
-        horario = data_jogo.strftime("%H:%M")
+        data_jogo_brasilia = data_jogo.astimezone(ZoneInfo("America/Sao_Paulo"))
+        horario = data_jogo_brasilia.strftime("%H:%M")
         
         jogo_texto = f"{horario} | {teams['home']['name']} vs {teams['away']['name']}"
         keyboard.append([InlineKeyboardButton(
