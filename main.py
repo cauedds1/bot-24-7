@@ -2436,17 +2436,30 @@ async def mostrar_pagina_ligas(query, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(text=mensagem, reply_markup=reply_markup, parse_mode='HTML')
 
 async def post_init(application: Application) -> None:
-    """Função executada após inicialização do bot para iniciar background worker"""
+    """Função executada após inicialização do bot para iniciar background workers"""
     print("🚀 Iniciando background analysis worker...")
     asyncio.create_task(job_queue.background_analysis_worker(db_manager))
     print("✅ Background worker iniciado!")
+    
+    print("🔄 Iniciando cache saver periódico...")
+    asyncio.create_task(cache_manager.periodic_cache_saver())
+    print("✅ Cache saver iniciado!")
 
 async def post_shutdown(application: Application) -> None:
     """Função executada no shutdown do bot para limpar recursos"""
+    print("🛑 Salvando cache final antes do shutdown...")
+    # Salvar cache uma última vez para evitar perda de dados
+    await asyncio.to_thread(cache_manager.save_cache_to_disk)
+    print("✅ Cache final salvo!")
+    
     print("🛑 Fechando conexões HTTP...")
     import api_client
     await api_client.close_http_client()
     print("✅ Conexões HTTP fechadas!")
+    
+    print("🛑 Fechando connection pool do banco...")
+    db_manager.close_pool()
+    print("✅ Connection pool fechado!")
 
 def main() -> None:
     if not TELEGRAM_TOKEN:

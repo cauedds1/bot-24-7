@@ -2,10 +2,12 @@
 import os
 import json
 import psycopg2
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, Json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 from zoneinfo import ZoneInfo
+from contextlib import contextmanager
 
 # 🇧🇷 HORÁRIO DE BRASÍLIA: Todas as operações de datetime usam timezone de Brasília
 BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
@@ -18,21 +20,50 @@ class DatabaseManager:
     """
     Gerenciador de banco de dados para armazenar análises completas de jogos.
     Evita refazer análises desnecessárias e economiza créditos da API.
+    Usa connection pooling para melhor performance e eficiência.
     """
 
-    def __init__(self):
+    def __init__(self, min_conn=1, max_conn=10):
         self.database_url = os.getenv('DATABASE_URL')
         if not self.database_url:
             print("⚠️ DATABASE_URL não encontrado. Cache de análises desabilitado.")
             self.enabled = False
+            self.pool = None
         else:
             self.enabled = True
+            try:
+                # Criar connection pool
+                self.pool = psycopg2.pool.SimpleConnectionPool(
+                    min_conn,
+                    max_conn,
+                    self.database_url
+                )
+                print(f"✅ Connection pool criado: {min_conn}-{max_conn} conexões")
+            except Exception as e:
+                print(f"❌ Erro ao criar connection pool: {e}")
+                self.enabled = False
+                self.pool = None
 
+    @contextmanager
     def _get_connection(self):
-        """Cria conexão com o banco de dados"""
-        if not self.enabled:
-            return None
-        return psycopg2.connect(self.database_url)
+        """Context manager para obter conexão do pool"""
+        if not self.enabled or not self.pool:
+            yield None
+            return
+        
+        conn = None
+        try:
+            conn = self.pool.getconn()
+            yield conn
+        finally:
+            if conn:
+                self.pool.putconn(conn)
+    
+    def close_pool(self):
+        """Fecha o connection pool ao desligar a aplicação"""
+        if self.pool:
+            self.pool.closeall()
+            print("✅ Connection pool fechado")
 
     def salvar_analise(self, fixture_id: int, dados_jogo: dict, analises: dict, stats: dict):
         """
@@ -48,73 +79,75 @@ class DatabaseManager:
             return False
 
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._get_connection() as conn:
+                if not conn:
+                    return False
+                    
+                cursor = conn.cursor()
 
-            # Contar total de palpites
-            total_palpites = 0
-            confiancas = []
+                # Contar total de palpites
+                total_palpites = 0
+                confiancas = []
 
-            for mercado in ['gols', 'cantos', 'btts', 'resultado', 'cartoes']:
-                if mercado in analises and analises[mercado]:
-                    palpites = analises[mercado].get('palpites', [])
-                    total_palpites += len(palpites)
-                    for p in palpites:
-                        confiancas.append(p.get('confianca', 0))
+                for mercado in ['gols', 'cantos', 'btts', 'resultado', 'cartoes']:
+                    if mercado in analises and analises[mercado]:
+                        palpites = analises[mercado].get('palpites', [])
+                        total_palpites += len(palpites)
+                        for p in palpites:
+                            confiancas.append(p.get('confianca', 0))
 
-            confianca_media = round(sum(confiancas) / len(confiancas), 1) if confiancas else 0
+                confianca_media = round(sum(confiancas) / len(confiancas), 1) if confiancas else 0
 
-            # INSERT ou UPDATE
-            query = """
-                INSERT INTO analises_jogos 
-                (fixture_id, data_jogo, liga, time_casa, time_fora, 
-                 stats_casa, stats_fora, classificacao,
-                 analise_gols, analise_cantos, analise_btts, analise_resultado, analise_cartoes, analise_contexto,
-                 palpites_totais, confianca_media, data_analise, atualizado_em)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (fixture_id) 
-                DO UPDATE SET
-                    stats_casa = EXCLUDED.stats_casa,
-                    stats_fora = EXCLUDED.stats_fora,
-                    classificacao = EXCLUDED.classificacao,
-                    analise_gols = EXCLUDED.analise_gols,
-                    analise_cantos = EXCLUDED.analise_cantos,
-                    analise_btts = EXCLUDED.analise_btts,
-                    analise_resultado = EXCLUDED.analise_resultado,
-                    analise_cartoes = EXCLUDED.analise_cartoes,
-                    analise_contexto = EXCLUDED.analise_contexto,
-                    palpites_totais = EXCLUDED.palpites_totais,
-                    confianca_media = EXCLUDED.confianca_media,
-                    atualizado_em = EXCLUDED.atualizado_em
-            """
+                # INSERT ou UPDATE
+                query = """
+                    INSERT INTO analises_jogos 
+                    (fixture_id, data_jogo, liga, time_casa, time_fora, 
+                     stats_casa, stats_fora, classificacao,
+                     analise_gols, analise_cantos, analise_btts, analise_resultado, analise_cartoes, analise_contexto,
+                     palpites_totais, confianca_media, data_analise, atualizado_em)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (fixture_id) 
+                    DO UPDATE SET
+                        stats_casa = EXCLUDED.stats_casa,
+                        stats_fora = EXCLUDED.stats_fora,
+                        classificacao = EXCLUDED.classificacao,
+                        analise_gols = EXCLUDED.analise_gols,
+                        analise_cantos = EXCLUDED.analise_cantos,
+                        analise_btts = EXCLUDED.analise_btts,
+                        analise_resultado = EXCLUDED.analise_resultado,
+                        analise_cartoes = EXCLUDED.analise_cartoes,
+                        analise_contexto = EXCLUDED.analise_contexto,
+                        palpites_totais = EXCLUDED.palpites_totais,
+                        confianca_media = EXCLUDED.confianca_media,
+                        atualizado_em = EXCLUDED.atualizado_em
+                """
 
-            cursor.execute(query, (
-                fixture_id,
-                dados_jogo['data_jogo'],
-                dados_jogo['liga'],
-                dados_jogo['time_casa'],
-                dados_jogo['time_fora'],
-                Json(stats.get('stats_casa', {})),
-                Json(stats.get('stats_fora', {})),
-                Json(stats.get('classificacao', {})),
-                Json(analises.get('gols', {})),
-                Json(analises.get('cantos', {})),
-                Json(analises.get('btts', {})),
-                Json(analises.get('resultado', {})),
-                Json(analises.get('cartoes', {})),
-                Json(analises.get('contexto', {})),
-                total_palpites,
-                confianca_media,
-                agora_brasilia(),
-                agora_brasilia()
-            ))
+                cursor.execute(query, (
+                    fixture_id,
+                    dados_jogo['data_jogo'],
+                    dados_jogo['liga'],
+                    dados_jogo['time_casa'],
+                    dados_jogo['time_fora'],
+                    Json(stats.get('stats_casa', {})),
+                    Json(stats.get('stats_fora', {})),
+                    Json(stats.get('classificacao', {})),
+                    Json(analises.get('gols', {})),
+                    Json(analises.get('cantos', {})),
+                    Json(analises.get('btts', {})),
+                    Json(analises.get('resultado', {})),
+                    Json(analises.get('cartoes', {})),
+                    Json(analises.get('contexto', {})),
+                    total_palpites,
+                    confianca_media,
+                    agora_brasilia(),
+                    agora_brasilia()
+                ))
 
-            conn.commit()
-            cursor.close()
-            conn.close()
+                conn.commit()
+                cursor.close()
 
-            print(f"✅ Análise salva no banco: Fixture #{fixture_id} ({total_palpites} palpites)")
-            return True
+                print(f"✅ Análise salva no banco: Fixture #{fixture_id} ({total_palpites} palpites)")
+                return True
 
         except Exception as e:
             print(f"❌ Erro ao salvar análise no banco: {e}")
@@ -135,32 +168,34 @@ class DatabaseManager:
             return None
 
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            with self._get_connection() as conn:
+                if not conn:
+                    return None
+                    
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-            # Buscar apenas análises recentes
-            limite_tempo = agora_brasilia() - timedelta(hours=max_idade_horas)
+                # Buscar apenas análises recentes
+                limite_tempo = agora_brasilia() - timedelta(hours=max_idade_horas)
 
-            query = """
-                SELECT * FROM analises_jogos 
-                WHERE fixture_id = %s 
-                AND atualizado_em >= %s
-            """
+                query = """
+                    SELECT * FROM analises_jogos 
+                    WHERE fixture_id = %s 
+                    AND atualizado_em >= %s
+                """
 
-            cursor.execute(query, (fixture_id, limite_tempo))
-            resultado = cursor.fetchone()
+                cursor.execute(query, (fixture_id, limite_tempo))
+                resultado = cursor.fetchone()
 
-            cursor.close()
-            conn.close()
+                cursor.close()
 
-            if resultado:
-                # Converter de dict do psycopg2 para dict normal
-                analise = dict(resultado)
-                print(f"🎯 CACHE HIT (DB): Análise encontrada para Fixture #{fixture_id} ({analise['palpites_totais']} palpites)")
-                return analise
-            else:
-                print(f"⚡ CACHE MISS (DB): Análise não encontrada para Fixture #{fixture_id}")
-                return None
+                if resultado:
+                    # Converter de dict do psycopg2 para dict normal
+                    analise = dict(resultado)
+                    print(f"🎯 CACHE HIT (DB): Análise encontrada para Fixture #{fixture_id} ({analise['palpites_totais']} palpites)")
+                    return analise
+                else:
+                    print(f"⚡ CACHE MISS (DB): Análise não encontrada para Fixture #{fixture_id}")
+                    return None
 
         except Exception as e:
             print(f"❌ Erro ao buscar análise no banco: {e}")
@@ -177,21 +212,23 @@ class DatabaseManager:
             return 0
 
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._get_connection() as conn:
+                if not conn:
+                    return 0
+                    
+                cursor = conn.cursor()
 
-            limite_tempo = agora_brasilia() - timedelta(days=dias)
+                limite_tempo = agora_brasilia() - timedelta(days=dias)
 
-            query = "DELETE FROM analises_jogos WHERE data_jogo < %s"
-            cursor.execute(query, (limite_tempo,))
+                query = "DELETE FROM analises_jogos WHERE data_jogo < %s"
+                cursor.execute(query, (limite_tempo,))
 
-            deletados = cursor.rowcount
-            conn.commit()
-            cursor.close()
-            conn.close()
+                deletados = cursor.rowcount
+                conn.commit()
+                cursor.close()
 
-            print(f"🧹 Limpeza: {deletados} análises antigas removidas")
-            return deletados
+                print(f"🧹 Limpeza: {deletados} análises antigas removidas")
+                return deletados
 
         except Exception as e:
             print(f"❌ Erro ao limpar análises antigas: {e}")
@@ -205,30 +242,32 @@ class DatabaseManager:
             return {"enabled": False}
 
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            with self._get_connection() as conn:
+                if not conn:
+                    return {"enabled": True, "erro": "Conexão não disponível"}
+                    
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-            # Total de análises
-            cursor.execute("SELECT COUNT(*) as total FROM analises_jogos")
-            total = cursor.fetchone()['total']
+                # Total de análises
+                cursor.execute("SELECT COUNT(*) as total FROM analises_jogos")
+                total = cursor.fetchone()['total']
 
-            # Análises de hoje
-            cursor.execute("SELECT COUNT(*) as hoje FROM analises_jogos WHERE data_jogo = CURRENT_DATE")
-            hoje = cursor.fetchone()['hoje']
+                # Análises de hoje
+                cursor.execute("SELECT COUNT(*) as hoje FROM analises_jogos WHERE data_jogo = CURRENT_DATE")
+                hoje = cursor.fetchone()['hoje']
 
-            # Análises nas últimas 24h
-            cursor.execute("SELECT COUNT(*) as recentes FROM analises_jogos WHERE atualizado_em >= NOW() - INTERVAL '24 hours'")
-            recentes = cursor.fetchone()['recentes']
+                # Análises nas últimas 24h
+                cursor.execute("SELECT COUNT(*) as recentes FROM analises_jogos WHERE atualizado_em >= NOW() - INTERVAL '24 hours'")
+                recentes = cursor.fetchone()['recentes']
 
-            cursor.close()
-            conn.close()
+                cursor.close()
 
-            return {
-                "enabled": True,
-                "total_analises": total,
-                "analises_hoje": hoje,
-                "analises_24h": recentes
-            }
+                return {
+                    "enabled": True,
+                    "total_analises": total,
+                    "analises_hoje": hoje,
+                    "analises_24h": recentes
+                }
 
         except Exception as e:
             print(f"❌ Erro ao obter estatísticas: {e}")
@@ -242,17 +281,19 @@ class DatabaseManager:
             return False
 
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._get_connection() as conn:
+                if not conn:
+                    return False
+                    
+                cursor = conn.cursor()
 
-            cursor.execute("DELETE FROM analises_jogos WHERE fixture_id = %s", (fixture_id,))
+                cursor.execute("DELETE FROM analises_jogos WHERE fixture_id = %s", (fixture_id,))
 
-            conn.commit()
-            cursor.close()
-            conn.close()
+                conn.commit()
+                cursor.close()
 
-            print(f"🔄 Análise do Fixture #{fixture_id} removida. Será reanalisado.")
-            return True
+                print(f"🔄 Análise do Fixture #{fixture_id} removida. Será reanalisado.")
+                return True
 
         except Exception as e:
             print(f"❌ Erro ao forçar reanálise: {e}")
@@ -271,41 +312,38 @@ class DatabaseManager:
         if not self.enabled:
             return False
         
-        conn = None
-        cursor = None
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
-            query = """
-                INSERT INTO daily_analyses 
-                (fixture_id, analysis_type, dossier_json, user_id, created_at)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (fixture_id, analysis_type, user_id)
-                DO UPDATE SET
-                    dossier_json = EXCLUDED.dossier_json,
-                    created_at = EXCLUDED.created_at
-            """
-            
-            cursor.execute(query, (
-                fixture_id,
-                analysis_type,
-                dossier_json,
-                user_id,
-                agora_brasilia()
-            ))
-            
-            conn.commit()
-            return True
+            with self._get_connection() as conn:
+                if not conn:
+                    return False
+                    
+                cursor = conn.cursor()
+                
+                query = """
+                    INSERT INTO daily_analyses 
+                    (fixture_id, analysis_type, dossier_json, user_id, created_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (fixture_id, analysis_type, user_id)
+                    DO UPDATE SET
+                        dossier_json = EXCLUDED.dossier_json,
+                        created_at = EXCLUDED.created_at
+                """
+                
+                cursor.execute(query, (
+                    fixture_id,
+                    analysis_type,
+                    dossier_json,
+                    user_id,
+                    agora_brasilia()
+                ))
+                
+                conn.commit()
+                cursor.close()
+                return True
             
         except Exception as e:
             print(f"❌ Erro ao salvar daily analysis: {e}")
             return False
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()
     
     def get_daily_analyses(self, user_id: int, analysis_type: str, offset: int = 0, limit: int = 5) -> List[Dict]:
         """
@@ -323,34 +361,32 @@ class DatabaseManager:
         if not self.enabled:
             return []
         
-        conn = None
-        cursor = None
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            
-            query = """
-                SELECT id, fixture_id, analysis_type, dossier_json, created_at
-                FROM daily_analyses
-                WHERE user_id = %s AND analysis_type = %s
-                AND created_at >= CURRENT_DATE
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s
-            """
-            
-            cursor.execute(query, (user_id, analysis_type, limit, offset))
-            resultados = cursor.fetchall()
-            
-            return [dict(r) for r in resultados]
+            with self._get_connection() as conn:
+                if not conn:
+                    return []
+                    
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                
+                query = """
+                    SELECT id, fixture_id, analysis_type, dossier_json, created_at
+                    FROM daily_analyses
+                    WHERE user_id = %s AND analysis_type = %s
+                    AND created_at >= CURRENT_DATE
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                
+                cursor.execute(query, (user_id, analysis_type, limit, offset))
+                resultados = cursor.fetchall()
+                
+                cursor.close()
+                
+                return [dict(r) for r in resultados]
             
         except Exception as e:
             print(f"❌ Erro ao buscar daily analyses: {e}")
             return []
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()
     
     def count_daily_analyses(self, user_id: int, analysis_type: str) -> int:
         """
@@ -366,29 +402,27 @@ class DatabaseManager:
         if not self.enabled:
             return 0
         
-        conn = None
-        cursor = None
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
-            query = """
-                SELECT COUNT(*) as total
-                FROM daily_analyses
-                WHERE user_id = %s AND analysis_type = %s
-                AND created_at >= CURRENT_DATE
-            """
-            
-            cursor.execute(query, (user_id, analysis_type))
-            total = cursor.fetchone()[0]
-            
-            return total
+            with self._get_connection() as conn:
+                if not conn:
+                    return 0
+                    
+                cursor = conn.cursor()
+                
+                query = """
+                    SELECT COUNT(*) as total
+                    FROM daily_analyses
+                    WHERE user_id = %s AND analysis_type = %s
+                    AND created_at >= CURRENT_DATE
+                """
+                
+                cursor.execute(query, (user_id, analysis_type))
+                total = cursor.fetchone()[0]
+                
+                cursor.close()
+                
+                return total
             
         except Exception as e:
             print(f"❌ Erro ao contar daily analyses: {e}")
             return 0
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()

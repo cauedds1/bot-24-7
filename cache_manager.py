@@ -2,6 +2,7 @@
 import json
 import os
 import threading
+import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -15,6 +16,7 @@ def agora_brasilia():
 _cache = {}
 _cache_lock = threading.RLock()  # RLock (reentrant) para evitar deadlocks
 CACHE_FILE = "cache.json"
+_is_dirty = False  # Flag para indicar se o cache precisa ser salvo
 
 # Configurações inteligentes de expiração por tipo de dado
 # ⚡ CACHE CALIBRADO: TTLs otimizados por sensibilidade temporal
@@ -43,8 +45,9 @@ def set(key, value, expiration_minutes=None):
     """
     Adiciona um valor ao cache com tempo de expiração inteligente.
     Se não especificar tempo, usa valores otimizados por tipo.
+    Marca o cache como dirty para salvamento periódico em background.
     """
-    global _cache
+    global _cache, _is_dirty
 
     if expiration_minutes is None:
         expiration_minutes = get_expiration_for_key(key)
@@ -58,13 +61,13 @@ def set(key, value, expiration_minutes=None):
             "expires_at": expiration_time.isoformat(),
             "created_at": now.isoformat()
         }
-    save_cache_to_disk()
+        _is_dirty = True  # Marcar para salvamento posterior
 
 def get(key):
     """
     Busca um valor no cache, verificando se não expirou.
     """
-    global _cache
+    global _cache, _is_dirty
     with _cache_lock:
         data = _cache.get(key)
 
@@ -76,7 +79,7 @@ def get(key):
                 expiration_time = datetime.fromisoformat(data["expires_at"])
                 if agora_brasilia() > expiration_time:
                     del _cache[key]
-                    save_cache_to_disk()
+                    _is_dirty = True  # Marcar para salvamento posterior
                     return None
             except (TypeError, ValueError):
                  pass
@@ -85,11 +88,11 @@ def get(key):
 
 def clear():
     """Limpa todo o cache"""
-    global _cache
+    global _cache, _is_dirty
     with _cache_lock:
         _cache = {}
-    save_cache_to_disk()
-    print("✅ CACHE CLEARED: Toda memória foi limpa!")
+        _is_dirty = True  # Marcar para salvamento periódico
+    print("✅ CACHE CLEARED: Toda memória foi limpa! (Salvamento agendado)")
 
 def get_stats():
     """Retorna estatísticas do cache sem alterar o dict durante iteração"""
@@ -119,7 +122,7 @@ def get_stats():
 
 def save_cache_to_disk():
     """Salva o conteúdo do cache em um arquivo JSON"""
-    global _cache
+    global _cache, _is_dirty
     try:
         with _cache_lock:
             cache_copy = _cache.copy()  # Criar cópia para evitar race condition
@@ -129,15 +132,53 @@ def save_cache_to_disk():
                 json.dump(cache_copy, f, indent=4)
             else:
                 f.write('{}')
+        
+        # Resetar flag APENAS após escrita bem-sucedida
+        with _cache_lock:
+            _is_dirty = False
+            
     except Exception as e:
         print(f"❌ ERRO ao salvar o cache em disco: {e}")
+        # Flag permanece True para retry na próxima tentativa
+
+async def periodic_cache_saver(interval_minutes=5):
+    """
+    Tarefa em background que salva o cache periodicamente se houver mudanças.
+    Previne bloqueio do event loop ao desacoplar atualizações de salvamento.
+    Continua tentando mesmo após falhas de I/O para garantir persistência.
+    
+    Args:
+        interval_minutes: Intervalo entre verificações (padrão: 5 minutos)
+    """
+    global _is_dirty
+    
+    print(f"🔄 Cache saver iniciado: salvamento a cada {interval_minutes} minutos")
+    
+    while True:
+        try:
+            await asyncio.sleep(interval_minutes * 60)
+            
+            if _is_dirty:
+                print("💾 Salvando cache em background...")
+                # Executar I/O em thread separada para não bloquear event loop
+                await asyncio.to_thread(save_cache_to_disk)
+                print("✅ Cache salvo com sucesso")
+        except asyncio.CancelledError:
+            # Permitir shutdown limpo re-raising CancelledError
+            print("🛑 Cache saver cancelado (shutdown em progresso)")
+            raise
+        except Exception as e:
+            print(f"❌ Erro no periodic cache saver: {e}")
+            # Continuar loop para tentar novamente na próxima iteração
+            # _is_dirty permanece True para retry automático
+            continue
 
 def cleanup_expired():
     """
     Remove itens expirados do cache para liberar memória.
     Executado automaticamente ao carregar o cache.
     """
-    global _cache
+    global _cache, _is_dirty
     removidos = 0
 
     with _cache_lock:
@@ -154,10 +195,12 @@ def cleanup_expired():
         for key in keys_to_remove:
             del _cache[key]
             removidos += 1
+        
+        if removidos > 0:
+            _is_dirty = True  # Marcar para salvamento periódico
 
     if removidos > 0:
-        save_cache_to_disk()
-        print(f"🧹 CACHE CLEANUP: {removidos} itens expirados removidos")
+        print(f"🧹 CACHE CLEANUP: {removidos} itens expirados removidos (Salvamento agendado)")
 
     return removidos
 

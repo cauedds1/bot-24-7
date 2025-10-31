@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import json
 
@@ -25,6 +25,7 @@ class AnalysisJob:
         self.total_fixtures = 0
         self.processed = 0
         self.created_at = datetime.now()
+        self.completed_at = None
 
 async def add_analysis_job(user_id: int, analysis_type: str, league_id: Optional[int] = None, fixture_id: Optional[int] = None):
     job = AnalysisJob(user_id, analysis_type, league_id, fixture_id)
@@ -43,6 +44,35 @@ def get_job_status(job_id: str) -> Optional[Dict]:
             "type": job.analysis_type
         }
     return None
+
+def cleanup_old_jobs(max_age_hours: int = 24):
+    """
+    Remove jobs completados ou falhados com mais de X horas.
+    Previne memory leak mantendo apenas jobs recentes.
+    
+    Args:
+        max_age_hours: Idade máxima em horas (padrão: 24h)
+    """
+    now = datetime.now()
+    cutoff_time = now - timedelta(hours=max_age_hours)
+    
+    jobs_to_remove = []
+    for job_id, job in job_status.items():
+        # Remover se for job completado/falhado antigo
+        if job.status in ["completed", "failed"]:
+            if job.completed_at and job.completed_at < cutoff_time:
+                jobs_to_remove.append(job_id)
+            # Se não tem completed_at mas foi criado há muito tempo, remover também
+            elif not job.completed_at and job.created_at < cutoff_time:
+                jobs_to_remove.append(job_id)
+    
+    for job_id in jobs_to_remove:
+        del job_status[job_id]
+    
+    if jobs_to_remove:
+        logger.info(f"🧹 Limpeza automática: {len(jobs_to_remove)} jobs antigos removidos")
+    
+    return len(jobs_to_remove)
 
 async def background_analysis_worker(db_manager: DatabaseManager):
     logger.info("🚀 Background analysis worker iniciado!")
@@ -96,7 +126,11 @@ async def background_analysis_worker(db_manager: DatabaseManager):
                 await asyncio.sleep(0.1)
             
             job.status = "completed"
+            job.completed_at = datetime.now()
             logger.info(f"🎉 Job {job.job_id} concluído! {job.processed} jogos analisados")
+            
+            # Limpeza automática a cada job completado
+            cleanup_old_jobs()
             
             analysis_queue.task_done()
             
@@ -104,4 +138,5 @@ async def background_analysis_worker(db_manager: DatabaseManager):
             logger.error(f"❌ Erro no background worker: {e}")
             if 'job' in locals():
                 job.status = "failed"
+                job.completed_at = datetime.now()
             await asyncio.sleep(1)
