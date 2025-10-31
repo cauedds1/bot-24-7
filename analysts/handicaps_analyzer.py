@@ -38,7 +38,8 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
     if pos_casa != "N/A" and pos_fora != "N/A":
         try:
             diferenca_posicao = int(pos_fora) - int(pos_casa)
-        except:
+        except (ValueError, TypeError):
+            # Posições inválidas, manter diferença em 0
             pass
 
     # 3. ESCANTEIOS

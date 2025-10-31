@@ -162,7 +162,8 @@ def detectar_valor_contextual(stats_casa, stats_fora, jogo_info=None, classifica
             if pos_casa and pos_fora and pos_casa >= 16 and pos_fora >= 16:
                 contextos_valor['jogo_decisivo'] = True
                 contextos_valor['necessidade_resultado'] = True
-        except:
+        except Exception as e:
+            # Erro ao processar posições da tabela não é crítico
             pass
 
     return contextos_valor

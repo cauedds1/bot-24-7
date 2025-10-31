@@ -618,7 +618,8 @@ async def buscar_jogos_do_dia():
                         jogos_novos = len(data['response'])
                         todos_os_jogos.extend(data['response'])
                         print(f"  [{idx}/{len(LIGAS_DE_INTERESSE)}] Liga {liga_id}: +{jogos_novos} jogos (Total: {len(todos_os_jogos)})")
-            except:
+            except (httpx.TimeoutException, httpx.HTTPError) as e:
+                logger.warning(f"  [{idx}/{len(LIGAS_DE_INTERESSE)}] Liga {liga_id} (AMANHÃ): Erro - {str(e)[:80]}")
                 continue
         
         if len(todos_os_jogos) > 0:
@@ -1393,7 +1394,8 @@ async def buscar_estatisticas_jogo(fixture_id: int):
                     if valor and isinstance(valor, str) and '%' not in valor:
                         try:
                             valor = int(valor)
-                        except:
+                        except (ValueError, TypeError):
+                            # Manter valor original se conversão falhar
                             pass
 
                     stats_dict[tipo] = valor

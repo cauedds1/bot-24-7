@@ -381,7 +381,8 @@ def gerar_narrativa_palpite(sugestao, stats_casa, stats_fora, nome_casa, nome_fo
             narrativa = random.choice(opcoes)
         else:
             narrativa = f"Os dados estatísticos apontam FORTEMENTE para esta opção. Confiança {confianca}/10!"
-    except:
+    except Exception as e:
+        logging.warning(f"⚠️ Erro ao gerar narrativa persuasiva para {mercado}/{tipo}: {e}")
         narrativa = f"A análise técnica indica esta aposta com {confianca}/10 de confiança!"
 
     return f"📖 <b>Análise:</b> {narrativa}\n"
@@ -708,8 +709,8 @@ def detectar_diferenca_tecnica(jogo, classificacao, pos_casa, pos_fora):
                     f"💡 <b>CONTEXTO:</b> Líder visitante pode MASSACRAR lanterna!\n"
                     f"📊 Espere: Visitante pressionando, muitos cantos e finalizações."
                 )
-        except:
-            pass
+        except Exception as e:
+            logging.warning(f"⚠️ Erro ao analisar desequilíbrio na tabela: {e}")
     
     return alerta
 
@@ -2642,64 +2643,74 @@ async def post_init(application: Application) -> None:
     print("✅ Cache saver iniciado!")
 
 async def post_shutdown(application: Application) -> None:
-    """Função executada no shutdown do bot para limpar recursos"""
-    print("🛑 Salvando cache final antes do shutdown...")
-    # Salvar cache uma última vez para evitar perda de dados
-    await asyncio.to_thread(cache_manager.save_cache_to_disk)
-    print("✅ Cache final salvo!")
+    """
+    Hook oficial do python-telegram-bot executado no shutdown.
+    Garante que todos os recursos assíncronos sejam fechados na ordem correta.
     
-    print("🛑 Fechando conexões HTTP...")
-    import api_client
-    await api_client.close_http_client()
-    print("✅ Conexões HTTP fechadas!")
+    ORDEM CRÍTICA:
+    1. Salvar cache (dados em memória)
+    2. Fechar cliente HTTP assíncrono (httpx.AsyncClient)
+    3. Fechar connection pool do banco de dados
     
-    print("🛑 Fechando connection pool do banco...")
-    db_manager.close_pool()
-    print("✅ Connection pool fechado!")
+    Esta função é chamada automaticamente pelo Application quando:
+    - application.stop() é chamado
+    - Um signal (SIGINT/SIGTERM) é recebido
+    - O bot é encerrado normalmente
+    """
+    print("🛑 POST_SHUTDOWN: Iniciando limpeza de recursos...")
+    
+    try:
+        print("💾 Salvando cache final...")
+        await asyncio.to_thread(cache_manager.save_cache_to_disk)
+        print("✅ Cache salvo com sucesso!")
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar cache: {e}")
+    
+    try:
+        print("🔌 Fechando cliente HTTP assíncrono...")
+        import api_client
+        await api_client.close_http_client()
+        print("✅ Cliente HTTP fechado com sucesso!")
+    except Exception as e:
+        print(f"⚠️ Erro ao fechar cliente HTTP: {e}")
+    
+    try:
+        print("🗄️ Fechando connection pool do PostgreSQL...")
+        db_manager.close_pool()
+        print("✅ Connection pool fechado com sucesso!")
+    except Exception as e:
+        print(f"⚠️ Erro ao fechar connection pool: {e}")
+    
+    print("✅ POST_SHUTDOWN: Limpeza de recursos concluída!")
 
 def setup_signal_handlers(application: Application) -> None:
     """
-    Configura handlers para sinais do OS para garantir shutdown limpo.
-    Captura SIGINT (Ctrl+C) e SIGTERM (kill) para executar cleanup.
+    Configura handlers para sinais do OS (SIGINT/SIGTERM).
+    
+    CORREÇÃO CRÍTICA:
+    - Signal handlers devem ser SÍNCRONOS
+    - Não usar asyncio.create_task() dentro de signal handlers
+    - Apenas solicitar que o Application pare (stop()) de forma síncrona
+    - O próprio Application chamará post_shutdown() automaticamente
+    
+    Esta abordagem evita o RuntimeError: Event loop is closed
     """
     def signal_handler(signum, frame):
         signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
-        print(f"\n🛑 Sinal {signal_name} recebido! Iniciando shutdown gracioso...")
+        print(f"\n🛑 Sinal {signal_name} recebido! Solicitando shutdown gracioso...")
         
-        asyncio.create_task(graceful_shutdown(application))
+        # Solicitar parada do bot de forma síncrona
+        # O Application executará post_shutdown() automaticamente
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.call_soon_threadsafe(application.stop)
+        else:
+            print("⚠️ Event loop não está rodando, encerrando diretamente...")
+            os._exit(0)
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     print("✅ Signal handlers configurados (SIGINT, SIGTERM)")
-
-async def graceful_shutdown(application: Application) -> None:
-    """
-    Executa shutdown limpo quando sinais do OS são recebidos.
-    Garante que dados sejam salvos antes do encerramento.
-    """
-    try:
-        print("💾 Salvando cache antes de encerrar...")
-        await asyncio.to_thread(cache_manager.save_cache_to_disk)
-        print("✅ Cache salvo!")
-        
-        print("🔌 Fechando conexões HTTP...")
-        import api_client
-        await api_client.close_http_client()
-        print("✅ Conexões HTTP fechadas!")
-        
-        print("🗄️ Fechando connection pool do banco...")
-        db_manager.close_pool()
-        print("✅ Connection pool fechado!")
-        
-        print("🛑 Parando aplicação...")
-        await application.stop()
-        await application.shutdown()
-        print("✅ Shutdown completo!")
-        
-    except Exception as e:
-        print(f"⚠️ Erro durante shutdown: {e}")
-    finally:
-        os._exit(0)
 
 def main() -> None:
     asyncio.run(startup_validation())
