@@ -132,8 +132,6 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
                 
                 
                     pass
-                else:
-                    
                     if confianca >= 6.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_-2.5"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.5:
@@ -147,8 +145,6 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
                 
                 
                     pass
-                else:
-                    
                     if confianca >= 6.2:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_-2.0"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.2:
@@ -162,8 +158,6 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
                 
                 
                     pass
-                else:
-                    
                     if confianca >= 6.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_euro_casa_-2"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.5:
@@ -406,7 +400,6 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             "palpites": palpites,
             "dados_suporte": dados_suporte
         }
-    else:
         print(f"     ⚠️ Nenhum handicap adequado ao contexto do jogo\n")
 
     return None

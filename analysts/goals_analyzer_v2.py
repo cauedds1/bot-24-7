@@ -11,7 +11,7 @@ PHOENIX V2.0: Sistema de VETO + Confiança Calibrada
 
 from config import (ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_GOLS_OVER_UNDER,
                     MIN_CONFIANCA_GOLS_OVER_1_5, MIN_CONFIANCA_GOLS_OVER_3_5)
-from analysts.context_analyzer import verificar_veto_mercado
+# DEPRECATED: from analysts.context_analyzer import verificar_veto_mercado
 from analysts.confidence_calculator import calculate_final_confidence
 
 
@@ -43,107 +43,91 @@ def extract_goals_suggestions(analysis_packet, odds):
     
     if 'gols_ft_over_2.5' in odds and odds['gols_ft_over_2.5'] >= ODD_MINIMA_DE_VALOR:
         tipo = "Over 2.5"
-        is_vetado, razao_veto = verificar_veto_mercado(tipo, script)
-        if is_vetado:
-            print(f"  🚫 VETO: {tipo} vetado por {script} - {razao_veto}")
-        else:
-            # NOVO MODELO: Calcular confiança baseada em probabilidade estatística
-            confianca, breakdown = calculate_final_confidence(
-                statistical_probability_pct=over_2_5_prob,
-                bet_type=tipo,
-                tactical_script=script,
-                value_score_pct=0.0,  # Será calculado depois se necessário
-                odd=odds['gols_ft_over_2.5']
-            )
-            print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_2_5_prob:.0f}% -> Conf:{confianca:.1f}/10 (Base:{breakdown['confianca_base']:.1f}, Mods:{breakdown['modificador_script']:+.1f})")
-            if confianca >= 5.0:
-                palpites.append({
-                    "tipo": tipo,
-                    "confianca": confianca,
-                    "odd": odds['gols_ft_over_2.5'],
-                    "periodo": "FT",
-                    "time": "Total",
-                    "probabilidade": over_2_5_prob,
-                    "confidence_breakdown": breakdown
-                })
+        # NOVO MODELO: Calcular confiança baseada em probabilidade estatística
+        confianca, breakdown = calculate_final_confidence(
+            statistical_probability_pct=over_2_5_prob,
+            bet_type=tipo,
+            tactical_script=script,
+            value_score_pct=0.0,
+            odd=odds['gols_ft_over_2.5']
+        )
+        print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_2_5_prob:.0f}% -> Conf:{confianca:.1f}/10 (Base:{breakdown['confianca_base']:.1f}, Mods:{breakdown['modificador_script']:+.1f})")
+        if confianca >= 5.0:
+            palpites.append({
+                "tipo": tipo,
+                "confianca": confianca,
+                "odd": odds['gols_ft_over_2.5'],
+                "periodo": "FT",
+                "time": "Total",
+                "probabilidade": over_2_5_prob,
+                "confidence_breakdown": breakdown
+            })
     
     if 'gols_ft_under_2.5' in odds and odds['gols_ft_under_2.5'] >= ODD_MINIMA_DE_VALOR:
         tipo = "Under 2.5"
-        is_vetado, razao_veto = verificar_veto_mercado(tipo, script)
-        if is_vetado:
-            print(f"  🚫 VETO: {tipo} vetado por {script} - {razao_veto}")
-        else:
-            confianca, breakdown = calculate_final_confidence(
-                statistical_probability_pct=under_2_5_prob,
-                bet_type=tipo,
-                tactical_script=script,
-                value_score_pct=0.0,
-                odd=odds['gols_ft_under_2.5']
-            )
-            print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{under_2_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
-            if confianca >= 5.0:
-                palpites.append({
-                    "tipo": tipo,
-                    "confianca": confianca,
-                    "odd": odds['gols_ft_under_2.5'],
-                    "periodo": "FT",
-                    "time": "Total",
-                    "probabilidade": under_2_5_prob,
-                    "confidence_breakdown": breakdown
-                })
+        confianca, breakdown = calculate_final_confidence(
+            statistical_probability_pct=under_2_5_prob,
+            bet_type=tipo,
+            tactical_script=script,
+            value_score_pct=0.0,
+            odd=odds['gols_ft_under_2.5']
+        )
+        print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{under_2_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
+        if confianca >= 5.0:
+            palpites.append({
+                "tipo": tipo,
+                "confianca": confianca,
+                "odd": odds['gols_ft_under_2.5'],
+                "periodo": "FT",
+                "time": "Total",
+                "probabilidade": under_2_5_prob,
+                "confidence_breakdown": breakdown
+            })
     
     if 'gols_ft_over_1.5' in odds and odds['gols_ft_over_1.5'] >= ODD_MINIMA_DE_VALOR:
         tipo = "Over 1.5"
         over_1_5_prob = min(over_2_5_prob + 15, 90)
-        is_vetado, razao_veto = verificar_veto_mercado(tipo, script)
-        if is_vetado:
-            print(f"  🚫 VETO: {tipo} vetado por {script} - {razao_veto}")
-        else:
-            confianca, breakdown = calculate_final_confidence(
-                statistical_probability_pct=over_1_5_prob,
-                bet_type=tipo,
-                tactical_script=script,
-                value_score_pct=0.0,
-                odd=odds['gols_ft_over_1.5']
-            )
-            print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_1_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
-            if confianca >= 5.5:
-                palpites.append({
-                    "tipo": tipo,
-                    "confianca": confianca,
-                    "odd": odds['gols_ft_over_1.5'],
-                    "periodo": "FT",
-                    "time": "Total",
-                    "probabilidade": over_1_5_prob,
-                    "confidence_breakdown": breakdown
-                })
+        confianca, breakdown = calculate_final_confidence(
+            statistical_probability_pct=over_1_5_prob,
+            bet_type=tipo,
+            tactical_script=script,
+            value_score_pct=0.0,
+            odd=odds['gols_ft_over_1.5']
+        )
+        print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_1_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
+        if confianca >= 5.5:
+            palpites.append({
+                "tipo": tipo,
+                "confianca": confianca,
+                "odd": odds['gols_ft_over_1.5'],
+                "periodo": "FT",
+                "time": "Total",
+                "probabilidade": over_1_5_prob,
+                "confidence_breakdown": breakdown
+            })
     
     if 'gols_ft_over_3.5' in odds and odds['gols_ft_over_3.5'] >= ODD_MINIMA_DE_VALOR:
         tipo = "Over 3.5"
         if script == 'SCRIPT_OPEN_HIGH_SCORING_GAME':
             over_3_5_prob = max(over_2_5_prob - 20, 30)
-            is_vetado, razao_veto = verificar_veto_mercado(tipo, script)
-            if is_vetado:
-                print(f"  🚫 VETO: {tipo} vetado por {script} - {razao_veto}")
-            else:
-                confianca, breakdown = calculate_final_confidence(
-                    statistical_probability_pct=over_3_5_prob,
-                    bet_type=tipo,
-                    tactical_script=script,
-                    value_score_pct=0.0,
-                    odd=odds['gols_ft_over_3.5']
-                )
-                print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_3_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
-                if confianca >= 5.0:
-                    palpites.append({
-                        "tipo": tipo,
-                        "confianca": confianca,
-                        "odd": odds['gols_ft_over_3.5'],
-                        "periodo": "FT",
-                        "time": "Total",
-                        "probabilidade": over_3_5_prob,
-                        "confidence_breakdown": breakdown
-                    })
+            confianca, breakdown = calculate_final_confidence(
+                statistical_probability_pct=over_3_5_prob,
+                bet_type=tipo,
+                tactical_script=script,
+                value_score_pct=0.0,
+                odd=odds['gols_ft_over_3.5']
+            )
+            print(f"  📊 NOVO MODELO GOLS: {tipo} - Prob:{over_3_5_prob:.0f}% -> Conf:{confianca:.1f}/10")
+            if confianca >= 5.0:
+                palpites.append({
+                    "tipo": tipo,
+                    "confianca": confianca,
+                    "odd": odds['gols_ft_over_3.5'],
+                    "periodo": "FT",
+                    "time": "Total",
+                    "probabilidade": over_3_5_prob,
+                    "confidence_breakdown": breakdown
+                })
     
     if not palpites:
         return None
@@ -186,7 +170,6 @@ def _convert_probability_to_confidence(probability_pct):
         return 6.0
     elif probability_pct >= 35:
         return 5.5
-    else:
         return 5.0
 
 

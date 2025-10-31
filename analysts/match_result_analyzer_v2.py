@@ -7,7 +7,7 @@ PHOENIX V2.0: Agora com sistema de VETO e ajuste de confiança por script.
 """
 
 from config import ODD_MINIMA_DE_VALOR
-from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
+# DEPRECATED: from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
 
 
 def extract_match_result_suggestions(analysis_packet, odds):
@@ -39,50 +39,36 @@ def extract_match_result_suggestions(analysis_packet, odds):
     
     if 'home_win' in odds and odds['home_win'] >= ODD_MINIMA_DE_VALOR:
         tipo = "Vitória Casa"
-        is_vetado, razao_veto = verificar_veto_mercado(tipo, script)
-        if is_vetado:
-            print(f"  🚫 VETO: {tipo} vetado por {script} - {razao_veto}")
-        else:
-            confianca = _convert_probability_to_confidence(home_win_prob)
-            confianca = ajustar_confianca_por_script(confianca, tipo, script)
-            if confianca >= 5.5:
-                palpites.append({
-                    "tipo": "Vitória Casa (1)",
-                    "confianca": confianca,
-                    "odd": odds['home_win'],
-                    "probabilidade": home_win_prob
-                })
+        confianca = _convert_probability_to_confidence(home_win_prob)
+        if confianca >= 5.5:
+            palpites.append({
+                "tipo": "Vitória Casa (1)",
+                "confianca": confianca,
+                "odd": odds['home_win'],
+                "probabilidade": home_win_prob
+            })
     
     if 'draw' in odds and odds['draw'] >= ODD_MINIMA_DE_VALOR:
         tipo = "Draw"
-        is_vetado, razao_veto = verificar_veto_mercado(tipo, script)
-        if is_vetado:
-            print(f"  🚫 VETO: Empate vetado por {script} - {razao_veto}")
-        else:
-            confianca = _convert_probability_to_confidence(draw_prob)
-            if confianca >= 5.5:
-                palpites.append({
-                    "tipo": "Empate (X)",
-                    "confianca": confianca,
-                    "odd": odds['draw'],
-                    "probabilidade": draw_prob
-                })
+        confianca = _convert_probability_to_confidence(draw_prob)
+        if confianca >= 5.5:
+            palpites.append({
+                "tipo": "Empate (X)",
+                "confianca": confianca,
+                "odd": odds['draw'],
+                "probabilidade": draw_prob
+            })
     
     if 'away_win' in odds and odds['away_win'] >= ODD_MINIMA_DE_VALOR:
         tipo = "Vitória Fora"
-        is_vetado, razao_veto = verificar_veto_mercado(tipo, script)
-        if is_vetado:
-            print(f"  🚫 VETO: {tipo} vetado por {script} - {razao_veto}")
-        else:
-            confianca = _convert_probability_to_confidence(away_win_prob)
-            confianca = ajustar_confianca_por_script(confianca, tipo, script)
-            if confianca >= 5.5:
-                palpites.append({
-                    "tipo": "Vitória Fora (2)",
-                    "confianca": confianca,
-                    "odd": odds['away_win'],
-                    "probabilidade": away_win_prob
-                })
+        confianca = _convert_probability_to_confidence(away_win_prob)
+        if confianca >= 5.5:
+            palpites.append({
+                "tipo": "Vitória Fora (2)",
+                "confianca": confianca,
+                "odd": odds['away_win'],
+                "probabilidade": away_win_prob
+            })
     
     if 'double_chance_1x' in odds and odds['double_chance_1x'] >= ODD_MINIMA_DE_VALOR:
         double_1x_prob = home_win_prob + draw_prob
@@ -158,7 +144,6 @@ def _convert_probability_to_confidence(probability_pct):
         return 6.0
     elif probability_pct >= 35:
         return 5.5
-    else:
         return 5.0
 
 

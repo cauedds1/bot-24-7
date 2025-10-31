@@ -1,5 +1,5 @@
 # analysts/corners_analyzer.py
-from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CANTOS, MIN_CONFIANCA_CANTOS_UNDER
+from config import ODD_MINIMA_DE_VALOR, ODD_MINIMA_PENALIDADE, MIN_CONFIANCA_CANTOS, MIN_CONFIANCA_CANTOS_UNDER
 from analysts.context_analyzer import analisar_compatibilidade_ofensiva_defensiva
 from analysts.confidence_calculator import calculate_statistical_probability_corners_over, calculate_final_confidence
 
@@ -14,6 +14,7 @@ def ajustar_confianca_por_odd(confianca_base, odd):
     elif odd <= 5.0:
         return max(confianca_base - 1.5, MIN_CONFIANCA_CANTOS_UNDER)
     else:
+        # Odds muito altas (> 5.0): penalização severa
         return max(confianca_base - 2.5, MIN_CONFIANCA_CANTOS)
 
 def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, pos_casa="N/A", pos_fora="N/A", master_data=None, script_name=None):
@@ -21,7 +22,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
     Analisa mercado de cantos:
     1. PRIORIDADE: Buscar odds com valor (apostas rentáveis)
     2. FALLBACK: Gerar sugestão tática quando não há odds disponíveis
-    
     PHOENIX V2.0: Agora com sistema de VETO e ajuste de confiança por script.
     """
     if not stats_casa or not stats_fora:
@@ -112,7 +112,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         
                         if conf >= 5.0:
                             palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Total"})
@@ -137,7 +136,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         
                         if conf >= 5.5:
                             palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Total"})
@@ -158,7 +156,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.0:
                             palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "HT", "time": "Total"})
                 except ValueError:
@@ -177,7 +174,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.5:
                             palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "HT", "time": "Total"})
                 except ValueError:
@@ -197,7 +193,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.0:
                             palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Casa"})
                 except ValueError:
@@ -215,7 +210,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.5:
                             palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Casa"})
                 except ValueError:
@@ -235,7 +229,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.0:
                             palpites.append({"tipo": f"Over {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Fora"})
                 except ValueError:
@@ -253,7 +246,6 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                             
                             
                                 continue
-                            conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.5:
                             palpites.append({"tipo": f"Under {linha}", "confianca": conf, "odd": odd_value, "periodo": "FT", "time": "Fora"})
                 except ValueError:
