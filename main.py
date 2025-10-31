@@ -24,7 +24,7 @@ from analysts.btts_analyzer import analisar_mercado_btts
 from analysts.cards_analyzer import analisar_mercado_cartoes
 from analysts.shots_analyzer import analisar_mercado_finalizacoes
 from analysts.handicaps_analyzer import analisar_mercado_handicaps
-from analysts.context_analyzer import filtrar_mercados_por_contexto, get_quality_scores
+# PHOENIX V3.0: filtrar_mercados_por_contexto e get_quality_scores foram removidas na refatoração
 from analysts.value_detector import detectar_valor_contextual, calculate_value_score, format_value_percentage, get_value_rating
 from analysts.justification_generator import generate_persuasive_justification
 import job_queue
@@ -812,43 +812,27 @@ async def gerar_palpite_completo(jogo, filtro_mercado=None, filtro_tipo_linha=No
             print(f"  💎 VALOR CONTEXTUAL DETECTADO: {', '.join(contextos_ativos)}")
             print(f"     → Bot aceita odds menores (1.50+) para favoritos/clássicos/jogos decisivos")
 
-        # 📜 CALCULAR GAME SCRIPT antes de criar análises
-        time_casa_id = jogo['teams']['home']['id']
-        time_fora_id = jogo['teams']['away']['id']
-        home_quality, away_quality = get_quality_scores(time_casa_id, time_fora_id)
-        game_script = "EQUILIBRADO"  # Default
-        quality_difference = abs(home_quality - away_quality)
-        if quality_difference > 20:
-            game_script = "DOMINIO_CASA" if home_quality > away_quality else "DOMINIO_VISITANTE"
-        elif quality_difference > 10:
-            game_script = "FAVORITISMO_CASA" if home_quality > away_quality else "FAVORITISMO_VISITANTE"
-
+        # 📜 PHOENIX V3.0: game_script agora vem do master_analyzer
         # Buscar análise master para contexto tático
         analysis_packet = await generate_match_analysis(jogo)
+        script = analysis_packet.get('tactical_script_name', 'EQUILIBRADO') if analysis_packet else 'EQUILIBRADO'
         
         analises_brutas = [
-            analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, game_script),
-            analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, analysis_packet),
-            analisar_mercado_btts(stats_casa, stats_fora, odds),
+            analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script),
+            analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, analysis_packet, script),
+            analisar_mercado_btts(stats_casa, stats_fora, odds, script),
             analisar_mercado_resultado_final(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora),
-            analisar_mercado_cartoes(stats_casa, stats_fora, odds, analysis_packet),
-            analisar_mercado_finalizacoes(stats_casa, stats_fora, odds),
-            analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora)
+            analisar_mercado_cartoes(stats_casa, stats_fora, odds, analysis_packet, script),
+            analisar_mercado_finalizacoes(stats_casa, stats_fora, odds, analysis_packet, script),
+            analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script)
         ]
 
         print(f"  DEBUG Jogo {id_jogo}: Gols={bool(analises_brutas[0])}, Cantos={bool(analises_brutas[1])}, BTTS={bool(analises_brutas[2])}, Resultado={bool(analises_brutas[3])}, Cartões={bool(analises_brutas[4])}, Finalizações={bool(analises_brutas[5])}, Handicaps={bool(analises_brutas[6])}")
 
-        # 🎯 FILTRO INTELIGENTE POR CONTEXTO DA PARTIDA
-        # Analisa o perfil do jogo e descarta mercados que NÃO fazem sentido contextualmente
-        # EXCETO quando usuário pede mercado específico (Cantos, Cartões, etc)
-        if filtro_mercado:
-            # Usuário pediu mercado específico - NÃO filtrar por contexto
-            analises_encontradas = [a for a in analises_brutas if a]
-            print(f"  ⚠️ MODO ESPECÍFICO: Ignorando filtro de contexto (usuário pediu '{filtro_mercado}')")
-        else:
-            # Análise geral - aplicar filtro de contexto
-            analises_filtradas, perfil_partida, game_script_filtered = filtrar_mercados_por_contexto(analises_brutas, stats_casa, stats_fora, time_casa_id, time_fora_id)
-            analises_encontradas = analises_filtradas
+        # 🎯 PHOENIX V3.0: Filtro de contexto removido - todos os analyzers já filtram internamente via confidence_calculator
+        # Apenas retorna análises válidas (não None)
+        analises_encontradas = [a for a in analises_brutas if a]
+        print(f"  ✅ PHOENIX V3.0: {len(analises_encontradas)} mercados analisados (filtro interno por confiança)")
 
         if analises_encontradas:
             total_palpites = sum(len(a.get('palpites', [])) for a in analises_encontradas)
@@ -1123,26 +1107,18 @@ async def coletar_todos_palpites_disponiveis():
                 if time_info['team']['name'] == jogo['teams']['away']['name']:
                     pos_fora = time_info['rank']
 
-        # 📜 CALCULAR GAME SCRIPT
-        home_quality, away_quality = get_quality_scores(time_casa_id, time_fora_id)
-        game_script = "EQUILIBRADO"
-        quality_difference = abs(home_quality - away_quality)
-        if quality_difference > 20:
-            game_script = "DOMINIO_CASA" if home_quality > away_quality else "DOMINIO_VISITANTE"
-        elif quality_difference > 10:
-            game_script = "FAVORITISMO_CASA" if home_quality > away_quality else "FAVORITISMO_VISITANTE"
-
-        # Buscar análise master para contexto tático
+        # 📜 PHOENIX V3.0: Buscar análise master para contexto tático
         analysis_packet = await generate_match_analysis(jogo)
+        script = analysis_packet.get('tactical_script_name', 'EQUILIBRADO') if analysis_packet else 'EQUILIBRADO'
         
         # Analisar todos os mercados COM OS PARÂMETROS CORRETOS
-        analise_gols = analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, game_script)
-        analise_cantos = analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, analysis_packet)
-        analise_btts = analisar_mercado_btts(stats_casa, stats_fora, odds)
+        analise_gols = analisar_mercado_gols(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script)
+        analise_cantos = analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, analysis_packet, script)
+        analise_btts = analisar_mercado_btts(stats_casa, stats_fora, odds, script)
         analise_resultado = analisar_mercado_resultado_final(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora)
-        analise_cartoes = analisar_mercado_cartoes(stats_casa, stats_fora, odds, analysis_packet)
-        analise_finalizacoes = analisar_mercado_finalizacoes(stats_casa, stats_fora, odds)
-        analise_handicaps = analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora)
+        analise_cartoes = analisar_mercado_cartoes(stats_casa, stats_fora, odds, analysis_packet, script)
+        analise_finalizacoes = analisar_mercado_finalizacoes(stats_casa, stats_fora, odds, analysis_packet, script)
+        analise_handicaps = analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao, pos_casa, pos_fora, script)
 
         # Coletar palpites
         for analise in [analise_gols, analise_cantos, analise_btts, analise_resultado, analise_cartoes, analise_finalizacoes, analise_handicaps]:
