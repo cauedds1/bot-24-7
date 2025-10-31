@@ -175,7 +175,79 @@ Função `converter_odd_para_float()` modificada:
 4. **Confiança calibrada**: Ajustes por qualidade melhoram precisão dos palpites
 5. **Odds válidas**: Fallback correto evita análises com dados inválidos
 
+## 🔧 Correções Críticas (31/10/2025 - Sessão 3)
+
+### ✅ FIX 1: Fuso Horário Brasília
+**Arquivos:** `main.py`, `api_client.py`
+
+Corrigido problema onde horários dos jogos apareciam em UTC ao invés de Brasília:
+- **Antes:** Jogos mostravam horário UTC (ex: 00:30 para jogo às 21:30 BRT)
+- **Depois:** Todos os horários convertidos para `America/Sao_Paulo` usando ZoneInfo
+- **Locais corrigidos:** Lista de jogos, análise completa, bingo, aposta simples, múltiplas
+- **Benefício:** Usa timezone-aware que respeita horário de verão automaticamente
+
+### ✅ FIX 2: Mensagem de Análise Completa
+**Arquivo:** `main.py`
+
+Removida mensagem redundante após análise:
+- **Antes:** Bot enviava análise + mensagem separada "✅ Análise completa!"
+- **Depois:** Botões anexados diretamente à mensagem de análise
+- **Benefício:** UX mais limpa, menos poluição de mensagens
+
+### ✅ FIX 3: QSC Data Pipeline REPARADO
+**Arquivo:** `api_client.py`
+
+**PROBLEMA CRÍTICO RESOLVIDO:** Position QS, Goal Diff QS e Form QS estavam defaultando para 50, "envenenando" todo o pipeline analítico.
+
+**Causa Raiz Identificada:**
+1. `buscar_classificacao_liga()` usava season "2025" hardcoded → retornava vazio (estamos em season 2024-2025)
+2. `buscar_estatisticas_gerais_time()` retornava apenas médias calculadas → não preservava campos `form` e `goals` que o QSC precisa
+
+**Correções Aplicadas:**
+- ✅ `buscar_classificacao_liga()`: Agora calcula season dinamicamente (igual `buscar_estatisticas_gerais_time`)
+- ✅ `buscar_estatisticas_gerais_time()`: Preserva campos `form` e `goals` do API response
+- ✅ Logs adicionados para debug de QSC pipeline
+
+**Impacto:**
+- Position QS agora reflete posição real na tabela (não mais 50 genérico)
+- Goal Diff QS calculado com saldo de gols real
+- Form QS calculado com forma recente real (W/D/L dos últimos 5 jogos)
+- SoS (Strength of Schedule) e Weighted Metrics agora funcionam corretamente
+
+### ✅ FIX 4: Tactical Tips Handling
+**Arquivo:** `main.py`
+
+**PROBLEMA RESOLVIDO:** Tactical Tips (dicas sem odd) eram descartados com erro "⚠️ Palpite ignorado (odd inválida)"
+
+**Solução Implementada:**
+- ✅ Lógica divergente: Checa `is_tactical` flag antes de validar odd
+- ✅ Tactical tips usam `confiança / 20.0` como priority score
+- ✅ Tips táticos agora competem com bets regulares na priorização
+- ✅ Não são mais descartados por falta de odd
+
+**Estrutura:**
+```python
+if is_tactical:
+    # Exempt from odd validation
+    priority = confidence / 20.0
+else:
+    # Regular bet: validate odd + calculate value_score
+```
+
+### 📊 Validação e Testes
+- ✅ Todos os 4 fixes revisados e aprovados pelo Architect Agent
+- ✅ Workflow reiniciado e testado
+- ✅ Logs confirmando funcionamento correto
+
+### 🎯 Impacto das Correções
+1. **Horários corretos**: Usuários veem jogos em horário de Brasília
+2. **UX melhorada**: Menos mensagens redundantes
+3. **QSC funcional**: Pipeline de análise agora usa dados reais, não valores padrão
+4. **Tactical tips preservados**: Dicas táticas aparecem nas análises
+5. **Análises mais precisas**: Com QSC real, todas as métricas downstream melhoram
+
 ## Histórico de Mudanças
+- 2025-10-31: 🔧 **4 Correções Críticas** - Fuso Horário, UX de Análise, QSC Data Pipeline, Tactical Tips Handling
 - 2025-10-29 (Sessão 2): 🎯 **4 Melhorias Técnicas Implementadas** - QSC Dinâmico, SoS Analysis, Weighted Metrics, Refinamento de Analyzers
 - 2025-10-29: 🚀 Setup inicial no Replit concluído - Bot rodando com stub analyzers
 - 2025-10-29: ✅ Banco de dados PostgreSQL configurado
