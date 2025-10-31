@@ -2634,6 +2634,14 @@ async def startup_validation():
 
 async def post_init(application: Application) -> None:
     """Função executada após inicialização do bot para iniciar background workers"""
+    # Criar e registrar cliente HTTP no contexto do Application
+    print("🔌 Criando cliente HTTP assíncrono...")
+    import api_client
+    http_client = api_client.create_http_client()
+    api_client.set_http_client(http_client)
+    application.bot_data['http_client'] = http_client
+    print("✅ Cliente HTTP criado e registrado!")
+    
     print("🚀 Iniciando background analysis worker...")
     asyncio.create_task(job_queue.background_analysis_worker(db_manager))
     print("✅ Background worker iniciado!")
@@ -2669,8 +2677,12 @@ async def post_shutdown(application: Application) -> None:
     try:
         print("🔌 Fechando cliente HTTP assíncrono...")
         import api_client
-        await api_client.close_http_client()
-        print("✅ Cliente HTTP fechado com sucesso!")
+        http_client = application.bot_data.get('http_client')
+        if http_client:
+            await api_client.close_http_client(http_client)
+            print("✅ Cliente HTTP fechado com sucesso!")
+        else:
+            print("⚠️ Cliente HTTP não encontrado no bot_data")
     except Exception as e:
         print(f"⚠️ Erro ao fechar cliente HTTP: {e}")
     

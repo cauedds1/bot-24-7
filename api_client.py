@@ -25,35 +25,60 @@ HEADERS = {
     "x-rapidapi-key": os.getenv("API_FOOTBALL_KEY")
 }
 
-# Cliente HTTP assíncrono global - lazy initialization para garantir event loop correto
-http_client = None
+# Cliente HTTP será gerenciado pelo Application context
+# Não usar variável global para evitar conflitos de event loop
+_http_client_instance = None
+
+def set_http_client(client):
+    """Define o cliente HTTP gerenciado pelo Application."""
+    global _http_client_instance
+    _http_client_instance = client
 
 def get_http_client():
     """
-    Retorna o cliente HTTP, criando-o se necessário.
-    Garante que o cliente seja criado no event loop correto.
+    Retorna o cliente HTTP gerenciado pelo Application.
+    Se não houver cliente configurado, cria um temporário.
     """
-    global http_client
-    if http_client is None:
-        # Criar com limits para evitar resource leak
-        http_client = httpx.AsyncClient(
-            timeout=10.0, 
-            headers=HEADERS,
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
-        )
-    return http_client
+    if _http_client_instance is not None:
+        return _http_client_instance
+    
+    # Fallback: criar cliente temporário (não ideal, mas previne crash)
+    logger.warning("⚠️ HTTP client não configurado via Application, criando temporário")
+    return httpx.AsyncClient(
+        timeout=10.0,
+        headers=HEADERS,
+        limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+    )
 
-async def close_http_client():
-    """Fecha o cliente HTTP para evitar vazamento de conexões."""
-    global http_client
-    if http_client is not None:
+def create_http_client():
+    """Cria um novo cliente HTTP com configurações apropriadas."""
+    return httpx.AsyncClient(
+        timeout=10.0,
+        headers=HEADERS,
+        limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+        http2=False  # Desabilitar HTTP/2 para maior compatibilidade
+    )
+
+async def close_http_client(client=None):
+    """Fecha o cliente HTTP especificado ou o global."""
+    global _http_client_instance
+    
+    target_client = client if client is not None else _http_client_instance
+    
+    if target_client is not None:
         try:
-            await http_client.aclose()
+            await target_client.aclose()
+            logger.info("✅ Cliente HTTP fechado com sucesso")
         except RuntimeError as e:
-            # Ignorar se o event loop já está fechado
-            if "Event loop is closed" not in str(e):
+            if "Event loop is closed" in str(e):
+                logger.warning("⚠️ Event loop já fechado, ignorando erro ao fechar HTTP client")
+            else:
                 raise
-        http_client = None
+        except Exception as e:
+            logger.error(f"❌ Erro ao fechar HTTP client: {e}")
+    
+    if client is None:
+        _http_client_instance = None
 
 @retry(
     stop=stop_after_attempt(5),
