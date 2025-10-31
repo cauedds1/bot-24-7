@@ -1,7 +1,7 @@
 # analysts/corners_analyzer.py
-from config import (ODD_MINIMA_DE_VALOR, ODD_MINIMA_PENALIDADE, MIN_CONFIANCA_CANTOS,
-                    MIN_CONFIANCA_CANTOS_UNDER, CANTOS_LINHA_MINIMA_FT_TOTAL)
-from analysts.context_analyzer import analisar_compatibilidade_ofensiva_defensiva, verificar_veto_mercado, ajustar_confianca_por_script
+from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CANTOS, MIN_CONFIANCA_CANTOS_UNDER
+from analysts.context_analyzer import analisar_compatibilidade_ofensiva_defensiva
+from analysts.confidence_calculator import calculate_statistical_probability_corners_over, calculate_final_confidence
 
 def ajustar_confianca_por_odd(confianca_base, odd):
     """Ajusta a confiança baseado na odd: penaliza odds muito altas."""
@@ -109,8 +109,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         
                         # LAYER 3 & 4: VETO e ajuste de confiança
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         
@@ -134,8 +134,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         
                         # LAYER 3 & 4: VETO e ajuste de confiança
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         
@@ -155,8 +155,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         conf_base = min(round(5.0 + (media_exp_ht - requisito) * 2.0, 1), 9.5)
                         conf = ajustar_confianca_por_odd(conf_base, odd_value)
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.0:
@@ -174,8 +174,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         conf_base = min(round(5.0 + (requisito - media_exp_ht) * 2.0, 1), 9.5)
                         conf = ajustar_confianca_por_odd(conf_base, odd_value)
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.5:
@@ -194,8 +194,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         conf_base = min(round(5.0 + (media_casa - requisito) * 2.0, 1), 9.5)
                         conf = ajustar_confianca_por_odd(conf_base, odd_value)
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.0:
@@ -212,8 +212,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         conf_base = min(round(5.0 + (requisito - media_casa) * 2.0, 1), 9.5)
                         conf = ajustar_confianca_por_odd(conf_base, odd_value)
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.5:
@@ -232,8 +232,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         conf_base = min(round(5.0 + (media_fora - requisito) * 2.0, 1), 9.5)
                         conf = ajustar_confianca_por_odd(conf_base, odd_value)
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.0:
@@ -250,8 +250,8 @@ def analisar_mercado_cantos(stats_casa, stats_fora, odds, classificacao=None, po
                         conf_base = min(round(5.0 + (requisito - media_fora) * 2.0, 1), 9.5)
                         conf = ajustar_confianca_por_odd(conf_base, odd_value)
                         if script_name:
-                            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                            if is_vetado:
+                            
+                            
                                 continue
                             conf = ajustar_confianca_por_script(conf, tipo_palpite, script_name)
                         if conf >= 5.5:

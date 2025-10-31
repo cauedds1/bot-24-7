@@ -46,6 +46,8 @@ def set(key, value, expiration_minutes=None):
     Adiciona um valor ao cache com tempo de expiração inteligente.
     Se não especificar tempo, usa valores otimizados por tipo.
     Marca o cache como dirty para salvamento periódico em background.
+    
+    PHOENIX V3.0 - CACHE GROWTH FIX: Agora com logging detalhado
     """
     global _cache, _is_dirty
 
@@ -56,12 +58,16 @@ def set(key, value, expiration_minutes=None):
     expiration_time = now + timedelta(minutes=expiration_minutes)
 
     with _cache_lock:
+        is_new_key = key not in _cache
         _cache[key] = {
             "value": value, 
             "expires_at": expiration_time.isoformat(),
             "created_at": now.isoformat()
         }
         _is_dirty = True  # Marcar para salvamento posterior
+        
+        if is_new_key:
+            print(f"💾 CACHE_SET: NEW key '{key[:50]}...' added (Total: {len(_cache)} items)")
 
 def get(key):
     """
@@ -147,6 +153,8 @@ async def periodic_cache_saver(interval_minutes=5):
     Previne bloqueio do event loop ao desacoplar atualizações de salvamento.
     Continua tentando mesmo após falhas de I/O para garantir persistência.
     
+    PHOENIX V3.0 - CACHE GROWTH FIX: Agora com stats detalhadas
+    
     Args:
         interval_minutes: Intervalo entre verificações (padrão: 5 minutos)
     """
@@ -159,10 +167,11 @@ async def periodic_cache_saver(interval_minutes=5):
             await asyncio.sleep(interval_minutes * 60)
             
             if _is_dirty:
-                print("💾 Salvando cache em background...")
+                stats = get_stats()
+                print(f"💾 Salvando cache em background... ({stats['validos']} válidos / {stats['total']} total)")
                 # Executar I/O em thread separada para não bloquear event loop
                 await asyncio.to_thread(save_cache_to_disk)
-                print("✅ Cache salvo com sucesso")
+                print(f"✅ Cache salvo com sucesso! Tamanho: {stats['total']} itens")
         except asyncio.CancelledError:
             # Permitir shutdown limpo re-raising CancelledError
             print("🛑 Cache saver cancelado (shutdown em progresso)")

@@ -1,6 +1,6 @@
 # analysts/handicaps_analyzer.py
 from config import ODD_MINIMA_DE_VALOR
-from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
+from analysts.confidence_calculator import calculate_final_confidence
 
 def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None, pos_casa="N/A", pos_fora="N/A", script_name=None):
     """
@@ -129,11 +129,11 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático -2.5 (Casa)"
             confianca = min(round(5.0 + superioridade_casa * 0.5, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                if is_vetado:
+                
+                
                     pass
                 else:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_-2.5"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.5:
@@ -144,11 +144,11 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático -2.0 (Casa)"
             confianca = min(round(5.0 + superioridade_casa * 0.45, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                if is_vetado:
+                
+                
                     pass
                 else:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.2:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_-2.0"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.2:
@@ -159,11 +159,11 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Europeu -2 (Casa)"
             confianca = min(round(5.0 + superioridade_casa * 0.4, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                if is_vetado:
+                
+                
                     pass
                 else:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_euro_casa_-2"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.5:
@@ -178,9 +178,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático -1.5 (Casa)"
             confianca = min(round(5.0 + superioridade_casa * 0.6, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.8:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_-1.5"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 5.8:
@@ -191,9 +191,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático -1.0 (Casa)"
             confianca = min(round(5.0 + superioridade_casa * 0.55, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_-1.0"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 5.5:
@@ -204,9 +204,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Europeu -1 (Casa)"
             confianca = min(round(5.0 + superioridade_casa * 0.5, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.8:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_euro_casa_-1"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 5.8:
@@ -221,9 +221,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático -0.5 (Casa)"
             confianca = min(round(5.0 + superioridade_casa * 0.7, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_-0.5"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 5.5:
@@ -238,9 +238,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático 0.0 (Casa)"
             confianca = min(round(5.5 + (2.0 - abs(superioridade_casa)) * 0.5, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_casa_0.0"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 5.5:
@@ -251,9 +251,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático +0.5 (Fora)"
             confianca = min(round(5.5 + (2.0 - abs(superioridade_casa)) * 0.6, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.8:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_fora_+0.5"], "periodo": "FT", "time": "Fora"})
             elif confianca >= 5.8:
@@ -268,9 +268,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático +1.0 (Fora)"
             confianca = min(round(5.0 + abs(superioridade_casa) * 0.7, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_fora_+1.0"], "periodo": "FT", "time": "Fora"})
             elif confianca >= 5.5:
@@ -285,9 +285,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático +1.5 (Fora)"
             confianca = min(round(5.0 + abs(superioridade_casa) * 0.6, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.8:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_fora_+1.5"], "periodo": "FT", "time": "Fora"})
             elif confianca >= 5.8:
@@ -298,9 +298,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Europeu +1 (Fora)"
             confianca = min(round(5.0 + abs(superioridade_casa) * 0.5, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 5.8:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_euro_fora_+1"], "periodo": "FT", "time": "Fora"})
             elif confianca >= 5.8:
@@ -315,9 +315,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático +2.0 (Fora)"
             confianca = min(round(5.0 + abs(superioridade_casa) * 0.45, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.2:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_fora_+2.0"], "periodo": "FT", "time": "Fora"})
             elif confianca >= 6.2:
@@ -328,9 +328,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático +2.5 (Fora)"
             confianca = min(round(5.0 + abs(superioridade_casa) * 0.5, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.5:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_asia_fora_+2.5"], "periodo": "FT", "time": "Fora"})
             elif confianca >= 6.5:
@@ -347,9 +347,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático Cantos -2.5 (Casa)"
             confianca = min(round(5.0 + diferenca_cantos * 0.6, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.0:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_cantos_asia_casa_-2.5"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.0:
@@ -360,9 +360,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Europeu Cantos -2 (Casa)"
             confianca = min(round(5.0 + diferenca_cantos * 0.5, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.0:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_cantos_euro_casa_-2"], "periodo": "FT", "time": "Casa"})
             elif confianca >= 6.0:
@@ -375,9 +375,9 @@ def analisar_mercado_handicaps(stats_casa, stats_fora, odds, classificacao=None,
             tipo_palpite = "Handicap Asiático Cantos +2.5 (Fora)"
             confianca = min(round(5.0 + abs(diferenca_cantos) * 0.6, 1), 9.5)
             if script_name:
-                is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+                
                 if not is_vetado:
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                     if confianca >= 6.0:
                         palpites.append({"tipo": tipo_palpite, "confianca": confianca, "odd": odds["handicap_cantos_asia_fora_+2.5"], "periodo": "FT", "time": "Fora"})
             elif confianca >= 6.0:

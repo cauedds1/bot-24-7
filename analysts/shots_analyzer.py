@@ -1,5 +1,5 @@
 # analysts/shots_analyzer.py
-from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
+from analysts.confidence_calculator import calculate_statistical_probability_shots_over, calculate_final_confidence
 
 def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data=None, script_name=None):
     """
@@ -44,11 +44,11 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         
         # LAYER 3 & 4: VETO e ajuste de confiança
         if script_name:
-            is_vetado, razao_veto = verificar_veto_mercado(tipo_palpite, script_name)
-            if is_vetado:
+            
+            
                 print(f"  🚫 VETO: {tipo_palpite} vetado por {script_name}")
             else:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({
                         "tipo": tipo_palpite + " (Total)",
@@ -71,9 +71,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         
         # LAYER 3 & 4: VETO e ajuste de confiança
         if script_name:
-            is_vetado, razao_veto = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({
                         "tipo": tipo_palpite + " (Total)",
@@ -96,9 +96,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         
         # LAYER 3 & 4: VETO e ajuste de confiança
         if script_name:
-            is_vetado, razao_veto = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({
                         "tipo": tipo_palpite + " (Total)",
@@ -119,9 +119,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         tipo_palpite = "Over 9.5 Finalizações no Gol"
         confianca = min(round(5.0 + (media_exp_no_gol - 9.5) * 0.3, 1), 6.8)
         if script_name:
-            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({"tipo": tipo_palpite + " (Total)", "confianca": confianca, "odd": None, "time": "Total"})
         elif confianca >= 5.5:
@@ -131,9 +131,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         tipo_palpite = "Under 7.5 Finalizações no Gol"
         confianca = min(round(5.0 + (6.5 - media_exp_no_gol) * 0.3, 1), 6.8)
         if script_name:
-            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({"tipo": tipo_palpite + " (Total)", "confianca": confianca, "odd": None, "time": "Total"})
         elif confianca >= 5.5:
@@ -144,9 +144,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         tipo_palpite = "Over 11.5 Finalizações Casa"
         confianca = min(round(5.0 + (finalizacoes_casa - 11.5) * 0.25, 1), 6.8)
         if script_name:
-            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({"tipo": "Over 11.5 Finalizações (Casa)", "confianca": confianca, "odd": None, "time": "Casa"})
         elif confianca >= 5.5:
@@ -156,9 +156,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         tipo_palpite = "Over 11.5 Finalizações Fora"
         confianca = min(round(5.0 + (finalizacoes_fora - 11.5) * 0.25, 1), 6.8)
         if script_name:
-            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({"tipo": "Over 11.5 Finalizações (Fora)", "confianca": confianca, "odd": None, "time": "Fora"})
         elif confianca >= 5.5:
@@ -168,9 +168,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         tipo_palpite = "Under 8.5 Finalizações Casa"
         confianca = min(round(5.0 + (7.5 - finalizacoes_casa) * 0.25, 1), 6.8)
         if script_name:
-            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({"tipo": "Under 8.5 Finalizações (Casa)", "confianca": confianca, "odd": None, "time": "Casa"})
         elif confianca >= 5.5:
@@ -180,9 +180,9 @@ def analisar_mercado_finalizacoes(stats_casa, stats_fora, odds=None, master_data
         tipo_palpite = "Under 8.5 Finalizações Fora"
         confianca = min(round(5.0 + (7.5 - finalizacoes_fora) * 0.25, 1), 6.8)
         if script_name:
-            is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
+            
             if not is_vetado:
-                confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                
                 if confianca >= 5.5:
                     palpites.append({"tipo": "Under 8.5 Finalizações (Fora)", "confianca": confianca, "odd": None, "time": "Fora"})
         elif confianca >= 5.5:

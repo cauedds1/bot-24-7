@@ -87,6 +87,45 @@ def calculate_statistical_probability_btts(
     return min(max(prob_btts, 0), 100)
 
 
+def calculate_statistical_probability_cards_over(
+    weighted_cards_avg: float,
+    line: float
+) -> float:
+    """
+    STEP 1: Calcula probabilidade estatística de Over X.5 cartões.
+    """
+    # Usar Poisson para cartões (distribuição similar a gols/cantos)
+    prob_under = 0.0
+    for k in range(int(line) + 1):
+        prob_under += (math.exp(-weighted_cards_avg) * (weighted_cards_avg ** k)) / math.factorial(k)
+    
+    prob_over = (1 - prob_under) * 100
+    return min(max(prob_over, 0), 100)
+
+
+def calculate_statistical_probability_shots_over(
+    weighted_shots_avg: float,
+    line: float
+) -> float:
+    """
+    STEP 1: Calcula probabilidade estatística de Over X.5 finalizações.
+    """
+    # Usar distribuição normal para finalizações (valores mais altos)
+    # Como aproximação, usar % baseado na média
+    if weighted_shots_avg >= line + 3:
+        return 75.0
+    elif weighted_shots_avg >= line + 1:
+        return 65.0
+    elif weighted_shots_avg >= line:
+        return 55.0
+    elif weighted_shots_avg >= line - 1:
+        return 45.0
+    elif weighted_shots_avg >= line - 3:
+        return 35.0
+    else:
+        return 25.0
+
+
 def calculate_historical_frequency_from_games(
     last_games_home: List[Dict],
     last_games_away: List[Dict],

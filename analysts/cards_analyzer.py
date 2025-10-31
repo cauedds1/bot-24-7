@@ -1,6 +1,6 @@
 # analysts/cards_analyzer.py
-from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CARTOES, MIN_CONFIANCA_CANTOS_UNDER
-from analysts.context_analyzer import verificar_veto_mercado, ajustar_confianca_por_script
+from config import ODD_MINIMA_DE_VALOR, MIN_CONFIANCA_CARTOES
+from analysts.confidence_calculator import calculate_statistical_probability_cards_over, calculate_final_confidence
 
 def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, script_name=None):
     """
@@ -76,11 +76,11 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 # LAYER 3 & 4: VETO e ajuste de confiança
                 tipo_palpite = f"Over {linha} Cartões"
                 if script_name:
-                    is_vetado, razao_veto = verificar_veto_mercado(tipo_palpite, script_name)
-                    if is_vetado:
+                    
+                    
                         print(f"  🚫 VETO: {tipo_palpite} vetado por {script_name} - {razao_veto}")
                         continue
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                 
                 # ⚡ AJUSTADO: Threshold reduzido de 5.5 para 5.0
                 if confianca >= 5.0:
@@ -99,10 +99,10 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 tipo_palpite = f"Under {linha} Cartões"
                 confianca = min(round(5.0 + (req - media_exp_total) * 2.0 - qsc_adjustment, 1), 9.5)
                 if script_name:
-                    is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                    if is_vetado:
+                    
+                    
                         continue
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                 if confianca >= 5.5:
                     palpites.append({"tipo": f"Under {linha}", "confianca": confianca, "odd": odds[odd_key], "time": "Total"})
 
@@ -114,10 +114,10 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 tipo_palpite = f"Over {linha} Cartões Casa"
                 confianca = min(round(5.0 + (media_casa - req) * 2.0 + qsc_adjustment, 1), 9.5)
                 if script_name:
-                    is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                    if is_vetado:
+                    
+                    
                         continue
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                 if confianca >= 5.0:
                     palpites.append({"tipo": f"Over {linha}", "confianca": confianca, "odd": odds[odd_key_over], "time": "Casa"})
 
@@ -126,10 +126,10 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 tipo_palpite = f"Under {linha} Cartões Casa"
                 confianca = min(round(5.0 + (req - media_casa) * 2.0 - qsc_adjustment, 1), 9.5)
                 if script_name:
-                    is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                    if is_vetado:
+                    
+                    
                         continue
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                 if confianca >= 5.5:
                     palpites.append({"tipo": f"Under {linha}", "confianca": confianca, "odd": odds[odd_key_under], "time": "Casa"})
 
@@ -141,10 +141,10 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 tipo_palpite = f"Over {linha} Cartões Fora"
                 confianca = min(round(5.0 + (media_fora - req) * 2.0 + qsc_adjustment, 1), 9.5)
                 if script_name:
-                    is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                    if is_vetado:
+                    
+                    
                         continue
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                 if confianca >= 5.0:
                     palpites.append({"tipo": f"Over {linha}", "confianca": confianca, "odd": odds[odd_key_over], "time": "Fora"})
 
@@ -153,10 +153,10 @@ def analisar_mercado_cartoes(stats_casa, stats_fora, odds, master_data=None, scr
                 tipo_palpite = f"Under {linha} Cartões Fora"
                 confianca = min(round(5.0 + (req - media_fora) * 2.0 - qsc_adjustment, 1), 9.5)
                 if script_name:
-                    is_vetado, _ = verificar_veto_mercado(tipo_palpite, script_name)
-                    if is_vetado:
+                    
+                    
                         continue
-                    confianca = ajustar_confianca_por_script(confianca, tipo_palpite, script_name)
+                    
                 if confianca >= 5.5:
                     palpites.append({"tipo": f"Under {linha}", "confianca": confianca, "odd": odds[odd_key_under], "time": "Fora"})
     
